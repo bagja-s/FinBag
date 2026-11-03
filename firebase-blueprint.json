@@ -1,0 +1,106 @@
+{
+  "entities": {
+    "userProfile": {
+      "title": "UserProfile",
+      "description": "User profile settings, currency, and language preferences",
+      "type": "object",
+      "properties": {
+        "displayName": { "type": "string", "maxLength": 100 },
+        "email": { "type": "string", "maxLength": 200 },
+        "baseCurrency": { "type": "string", "maxLength": 5 },
+        "language": { "type": "string", "maxLength": 5 },
+        "theme": { "type": "string", "maxLength": 10 }
+      },
+      "required": ["baseCurrency", "language"]
+    },
+    "wallet": {
+      "title": "Wallet",
+      "description": "Financial wallet or account such as Cash, Bank, or E-Wallet",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "maxLength": 100 },
+        "type": { "type": "string", "enum": ["cash", "bank", "ewallet", "investment"] },
+        "balance": { "type": "number" },
+        "currency": { "type": "string", "maxLength": 5 },
+        "color": { "type": "string", "maxLength": 30 },
+        "accountNumber": { "type": "string", "maxLength": 50 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["name", "type", "balance", "currency", "userId"]
+    },
+    "transaction": {
+      "title": "Transaction",
+      "description": "Income, expense, or transfer transaction record",
+      "type": "object",
+      "properties": {
+        "date": { "type": "string", "maxLength": 20 },
+        "amount": { "type": "number" },
+        "currency": { "type": "string", "maxLength": 5 },
+        "exchangeRateToBase": { "type": "number" },
+        "type": { "type": "string", "enum": ["expense", "income", "transfer"] },
+        "categoryId": { "type": "string", "maxLength": 50 },
+        "sourceWalletId": { "type": "string", "maxLength": 128 },
+        "targetWalletId": { "type": "string", "maxLength": 128 },
+        "description": { "type": "string", "maxLength": 200 },
+        "notes": { "type": "string", "maxLength": 500 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["date", "amount", "currency", "type", "sourceWalletId", "description", "userId"]
+    },
+    "budget": {
+      "title": "Budget",
+      "description": "Monthly budget limit per expense category",
+      "type": "object",
+      "properties": {
+        "categoryName": { "type": "string", "maxLength": 100 },
+        "monthlyLimit": { "type": "number" },
+        "currency": { "type": "string", "maxLength": 5 },
+        "icon": { "type": "string", "maxLength": 50 },
+        "color": { "type": "string", "maxLength": 30 },
+        "userId": { "type": "string", "maxLength": 128 }
+      },
+      "required": ["categoryName", "monthlyLimit", "currency", "userId"]
+    },
+    "goal": {
+      "title": "Goal",
+      "description": "Savings goal target pot",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "maxLength": 100 },
+        "targetAmount": { "type": "number" },
+        "currentAmount": { "type": "number" },
+        "currency": { "type": "string", "maxLength": 5 },
+        "targetDate": { "type": "string", "maxLength": 20 },
+        "color": { "type": "string", "maxLength": 30 },
+        "icon": { "type": "string", "maxLength": 50 },
+        "userId": { "type": "string", "maxLength": 128 }
+      },
+      "required": ["title", "targetAmount", "currentAmount", "currency", "userId"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "userProfile",
+      "description": "Stores user profile and preferences"
+    },
+    "/users/{userId}/wallets/{walletId}": {
+      "schema": "wallet",
+      "description": "Stores accounts and wallets owned by the user"
+    },
+    "/users/{userId}/transactions/{transactionId}": {
+      "schema": "transaction",
+      "description": "Stores transaction ledger entries for the user"
+    },
+    "/users/{userId}/budgets/{budgetId}": {
+      "schema": "budget",
+      "description": "Stores budget targets for the user"
+    },
+    "/users/{userId}/goals/{goalId}": {
+      "schema": "goal",
+      "description": "Stores financial savings goals for the user"
+    }
+  }
+}

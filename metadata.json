@@ -1,0 +1,8 @@
+{
+  "name": "FinBag - Personal Finance & Multi-Currency Tracker",
+  "description": "Aplikasi PWA pencatat keuangan personal multi-user, multi-dompet, multi-mata uang dengan kurs real-time, manajemen anggaran, dan estetika Eksekutif Navy.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

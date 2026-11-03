@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0A192F"/>
+      <stop offset="100%" stop-color="#030712"/>
+    </linearGradient>
+    <linearGradient id="primaryGlow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3B82F6"/>
+      <stop offset="100%" stop-color="#1D4ED8"/>
+    </linearGradient>
+    <linearGradient id="accentGlow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#10B981"/>
+      <stop offset="100%" stop-color="#059669"/>
+    </linearGradient>
+  </defs>
+  
+  <!-- Rounded Base Background -->
+  <rect width="512" height="512" rx="128" fill="url(#bg)"/>
+  <rect x="16" y="16" width="480" height="480" rx="112" fill="none" stroke="#1E3A8A" stroke-width="4" stroke-opacity="0.5"/>
+  
+  <!-- Main Bag / Wallet Body -->
+  <path d="M128 180 C128 155 148 136 172 136 L340 136 C364 136 384 155 384 180 L384 372 C384 396 364 416 340 416 L172 416 C148 416 128 396 128 372 Z" fill="url(#primaryGlow)"/>
+  
+  <!-- Handle -->
+  <path d="M192 136 V112 C192 88 212 68 236 68 H276 C300 68 320 88 320 112 V136" fill="none" stroke="#60A5FA" stroke-width="24" stroke-linecap="round"/>
+  
+  <!-- Bag Fold & Flap -->
+  <path d="M128 200 L256 280 L384 200" fill="none" stroke="#93C5FD" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+  
+  <!-- Security / Lock Badge -->
+  <circle cx="256" cy="300" r="38" fill="#0A192F" stroke="#F59E0B" stroke-width="8"/>
+  <path d="M246 300 L253 310 L268 290" fill="none" stroke="#10B981" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Currency Pulse Arc -->
+  <path d="M100 256 A 156 156 0 0 1 412 256" fill="none" stroke="url(#accentGlow)" stroke-width="12" stroke-linecap="round" stroke-dasharray="8 16"/>
+</svg>
