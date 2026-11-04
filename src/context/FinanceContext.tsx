@@ -69,6 +69,9 @@ interface FinanceContextType {
   setIsTransactionModalOpen: (open: boolean) => void;
   isAddWalletModalOpen: boolean;
   setIsAddWalletModalOpen: (open: boolean) => void;
+  editingTransaction: Transaction | null;
+  setEditingTransaction: (tx: Transaction | null) => void;
+  openEditTransaction: (tx: Transaction) => void;
 
   // Data
   wallets: WalletAccount[];
@@ -81,6 +84,7 @@ interface FinanceContextType {
 
   // Actions
   addTransaction: (tx: Omit<Transaction, 'id'>) => Promise<void>;
+  updateTransaction: (id: string, updatedTx: Omit<Transaction, 'id' | 'userId' | 'createdAt'>) => Promise<void>;
   deleteTransaction: (id: string) => Promise<void>;
   addWallet: (wallet: Omit<WalletAccount, 'id'>) => Promise<void>;
   transferFunds: (sourceId: string, targetId: string, amount: number, currency: SupportedCurrency) => Promise<void>;
@@ -125,6 +129,12 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
   const [activeTab, setActiveTab] = useState<'dashboard' | 'wallets' | 'rates' | 'tools' | 'budgets' | 'transactions'>('dashboard');
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
   const [isAddWalletModalOpen, setIsAddWalletModalOpen] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+
+  const openEditTransaction = (tx: Transaction) => {
+    setEditingTransaction(tx);
+    setIsTransactionModalOpen(true);
+  };
 
   // Financial Data - strictly empty initial state directly loaded from user database
   const [wallets, setWallets] = useState<WalletAccount[]>([]);
@@ -336,6 +346,76 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
       const txPath = `users/${user.uid}/transactions`;
       try {
         await setDoc(doc(db, txPath, newId), cleanFirestoreData(newTx));
+      } catch (err) {
+        handleFirestoreError(err, OperationType.WRITE, txPath);
+      }
+    }
+  };
+
+  const updateTransaction = async (
+    id: string,
+    updatedData: Omit<Transaction, 'id' | 'userId' | 'createdAt'>
+  ) => {
+    const oldTx = transactions.find((t) => t.id === id);
+    if (!oldTx) return;
+
+    const updatedTx: Transaction = {
+      ...updatedData,
+      id,
+      userId: user?.uid,
+      createdAt: oldTx.createdAt || new Date().toISOString(),
+    };
+
+    // Recalculate wallet balances: rollback oldTx and apply updatedTx
+    setWallets((prevWallets) => {
+      return prevWallets.map((w) => {
+        let newBalance = w.balance;
+
+        // 1. Rollback old transaction impact
+        if (oldTx.type === 'expense' && w.id === oldTx.sourceWalletId) {
+          newBalance += oldTx.amount;
+        } else if (oldTx.type === 'income' && w.id === oldTx.sourceWalletId) {
+          newBalance -= oldTx.amount;
+        } else if (oldTx.type === 'transfer') {
+          if (w.id === oldTx.sourceWalletId) {
+            newBalance += oldTx.amount;
+          } else if (w.id === oldTx.targetWalletId) {
+            const sourceW = prevWallets.find((x) => x.id === oldTx.sourceWalletId);
+            const sourceCurr = sourceW ? sourceW.currency : oldTx.currency;
+            const targetCurr = w.currency;
+            const converted = convertCurrency(oldTx.amount, sourceCurr, targetCurr, exchangeRates.rates);
+            newBalance -= converted;
+          }
+        }
+
+        // 2. Apply new transaction impact
+        if (updatedTx.type === 'expense' && w.id === updatedTx.sourceWalletId) {
+          newBalance -= updatedTx.amount;
+        } else if (updatedTx.type === 'income' && w.id === updatedTx.sourceWalletId) {
+          newBalance += updatedTx.amount;
+        } else if (updatedTx.type === 'transfer') {
+          if (w.id === updatedTx.sourceWalletId) {
+            newBalance -= updatedTx.amount;
+          } else if (w.id === updatedTx.targetWalletId) {
+            const sourceW = prevWallets.find((x) => x.id === updatedTx.sourceWalletId);
+            const sourceCurr = sourceW ? sourceW.currency : updatedTx.currency;
+            const targetCurr = w.currency;
+            const converted = convertCurrency(updatedTx.amount, sourceCurr, targetCurr, exchangeRates.rates);
+            newBalance += converted;
+          }
+        }
+
+        return { ...w, balance: newBalance };
+      });
+    });
+
+    setTransactions((prev) => prev.map((t) => (t.id === id ? updatedTx : t)));
+
+    // Sync to Firestore
+    if (user) {
+      const txPath = `users/${user.uid}/transactions`;
+      try {
+        await setDoc(doc(db, txPath, id), cleanFirestoreData(updatedTx));
       } catch (err) {
         handleFirestoreError(err, OperationType.WRITE, txPath);
       }
@@ -618,6 +698,9 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
         setIsTransactionModalOpen,
         isAddWalletModalOpen,
         setIsAddWalletModalOpen,
+        editingTransaction,
+        setEditingTransaction,
+        openEditTransaction,
         wallets,
         transactions,
         categories,
@@ -626,6 +709,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
         isRatesLoading,
         refreshExchangeRates,
         addTransaction,
+        updateTransaction,
         deleteTransaction,
         addWallet,
         transferFunds,

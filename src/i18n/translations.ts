@@ -119,6 +119,20 @@ export const translations = {
     edit: 'Ubah',
     confirm: 'Konfirmasi',
     successSaved: 'Berhasil disimpan',
+
+    // Edit & Confirmations
+    editTransactionModalTitle: 'Edit Transaksi FinBag',
+    confirmDeleteTransactionTitle: 'Hapus Catatan Transaksi?',
+    confirmDeleteTransactionDesc: 'Tindakan ini akan mengembalikan saldo dompet terkait dan menghapus catatan transaksi secara permanen.',
+    confirmEditTransactionTitle: 'Simpan Perubahan Transaksi?',
+    confirmEditTransactionDesc: 'Saldo dompet Anda akan disesuaikan secara otomatis berdasarkan perubahan nominal atau dompet.',
+    autoDetectedCategory: 'Kategori Terdeteksi Otomatis',
+    autoDetectedDesc: 'Otomatis dari kata kunci',
+    changeCategory: 'Ubah',
+    confirmTransferTitle: 'Konfirmasi Transfer Dana',
+    confirmTransferDesc: 'Anda akan memindahkan saldo dari dompet asal ke dompet tujuan.',
+    confirmClearDbTitle: 'Hapus Seluruh Database?',
+    confirmClearDbDesc: 'Seluruh data dompet, transaksi, pagu anggaran, dan target tabungan Anda di Cloud Firestore akan dihapus secara permanen. Tindakan ini tidak dapat dibatalkan.',
   },
   en: {
     appTitle: 'FinBag',
@@ -238,6 +252,20 @@ export const translations = {
     edit: 'Edit',
     confirm: 'Confirm',
     successSaved: 'Successfully saved',
+
+    // Edit & Confirmations
+    editTransactionModalTitle: 'Edit FinBag Transaction',
+    confirmDeleteTransactionTitle: 'Delete Transaction Record?',
+    confirmDeleteTransactionDesc: 'This action will rollback the affected wallet balance and permanently delete this transaction.',
+    confirmEditTransactionTitle: 'Save Changes to Transaction?',
+    confirmEditTransactionDesc: 'Your wallet balance will be adjusted automatically according to the updated amount or wallet.',
+    autoDetectedCategory: 'Auto-detected Category',
+    autoDetectedDesc: 'Auto-matched from keywords',
+    changeCategory: 'Change',
+    confirmTransferTitle: 'Confirm Fund Transfer',
+    confirmTransferDesc: 'You are transferring funds from the source wallet to the destination wallet.',
+    confirmClearDbTitle: 'Wipe Entire Database?',
+    confirmClearDbDesc: 'All your wallets, transactions, budget limits, and savings goals in Cloud Firestore will be permanently deleted. This action cannot be undone.',
   },
 };
 

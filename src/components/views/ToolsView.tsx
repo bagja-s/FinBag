@@ -18,8 +18,10 @@ import {
   CheckCircle2,
   DollarSign,
   Database,
-  AlertTriangle
+  AlertTriangle,
+  Trash2
 } from 'lucide-react';
+import { ConfirmationModal } from '../common/ConfirmationModal';
 
 export const ToolsView: React.FC = () => {
   const { 
@@ -556,30 +558,13 @@ export const ToolsView: React.FC = () => {
                 </div>
               </div>
 
-              {!showResetConfirm ? (
-                <button
-                  onClick={() => setShowResetConfirm(true)}
-                  className="shrink-0 rounded-xl border border-rose-300 bg-white px-3.5 py-2 text-xs font-bold text-rose-600 shadow-sm hover:bg-rose-100 dark:border-rose-800 dark:bg-rose-950/50 dark:text-rose-300 dark:hover:bg-rose-900/60 transition-colors"
-                >
-                  {language === 'id' ? 'Kosongkan Database' : 'Clear Database'}
-                </button>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setShowResetConfirm(false)}
-                    className="rounded-xl border border-slate-300 px-3 py-1.5 text-xs text-slate-600 dark:border-slate-700 dark:text-slate-300"
-                  >
-                    Batal
-                  </button>
-                  <button
-                    onClick={handleClearDatabase}
-                    disabled={isResetting}
-                    className="rounded-xl bg-rose-600 px-3.5 py-1.5 text-xs font-bold text-white shadow hover:bg-rose-500 disabled:opacity-50"
-                  >
-                    {isResetting ? 'Mengosongkan...' : 'Ya, Bersihkan Total'}
-                  </button>
-                </div>
-              )}
+              <button
+                onClick={() => setShowResetConfirm(true)}
+                className="shrink-0 flex items-center gap-1.5 rounded-xl border border-rose-300 bg-white px-3.5 py-2 text-xs font-bold text-rose-600 shadow-sm hover:bg-rose-100 dark:border-rose-800 dark:bg-rose-950/50 dark:text-rose-300 dark:hover:bg-rose-900/60 transition-colors cursor-pointer"
+              >
+                <Trash2 className="h-4 w-4" />
+                <span>{language === 'id' ? 'Kosongkan Database' : 'Clear Database'}</span>
+              </button>
             </div>
 
             {resetSuccessMsg && (
@@ -591,6 +576,25 @@ export const ToolsView: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Database Clear Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showResetConfirm}
+        title={t.confirmClearDbTitle}
+        message={t.confirmClearDbDesc}
+        confirmText={language === 'id' ? 'Ya, Bersihkan Seluruh Database' : 'Yes, Wipe All Database'}
+        cancelText={t.cancel}
+        variant="danger"
+        isLoading={isResetting}
+        onConfirm={handleClearDatabase}
+        onCancel={() => setShowResetConfirm(false)}
+        details={[
+          { label: 'Cloud Database', value: 'Google Cloud Firestore' },
+          { label: 'Dompet Tersimpan', value: `${wallets.length} rekening` },
+          { label: 'Riwayat Transaksi', value: `${transactions.length} transaksi` },
+          { label: 'Target Tabungan', value: `${goals.length} target` },
+        ]}
+      />
     </div>
   );
 };

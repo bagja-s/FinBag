@@ -1,7 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useFinance } from '../../context/FinanceContext';
 import { getTranslation } from '../../i18n/translations';
 import { TransactionType, SupportedCurrency } from '../../types/finance';
+import { predictCategory } from '../../utils/categoryMatcher';
+import { ConfirmationModal } from '../common/ConfirmationModal';
+import { formatCurrency } from '../../utils/financeCalculations';
 import { 
   X, 
   ArrowDownLeft, 
@@ -10,21 +13,28 @@ import {
   Calendar, 
   FileText, 
   Tag, 
-  Wallet 
+  Wallet,
+  Sparkles,
+  Edit3
 } from 'lucide-react';
 
 export const TransactionModal: React.FC = () => {
   const { 
     isTransactionModalOpen, 
     setIsTransactionModalOpen, 
+    editingTransaction,
+    setEditingTransaction,
     wallets, 
     categories, 
     addTransaction, 
+    updateTransaction,
     baseCurrency, 
     language 
   } = useFinance();
 
   const t = getTranslation(language);
+
+  const isEditMode = Boolean(editingTransaction);
 
   const [type, setType] = useState<TransactionType>('expense');
   const [amountStr, setAmountStr] = useState<string>('');
@@ -37,13 +47,83 @@ export const TransactionModal: React.FC = () => {
   const [notes, setNotes] = useState<string>('');
   const [errorMsg, setErrorMsg] = useState<string>('');
 
+  // Auto-categorization indicator state
+  const [autoDetectedCategory, setAutoDetectedCategory] = useState<string | null>(null);
+  const [userManuallySelectedCategory, setUserManuallySelectedCategory] = useState<boolean>(false);
+
+  // Confirmation Modal state
+  const [showConfirmModal, setShowConfirmModal] = useState<boolean>(false);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+
+  // Sync state whenever modal opens or editingTransaction changes
+  useEffect(() => {
+    if (!isTransactionModalOpen) return;
+
+    if (editingTransaction) {
+      setType(editingTransaction.type);
+      setAmountStr(editingTransaction.amount.toString());
+      setCurrency(editingTransaction.currency);
+      setSourceWalletId(editingTransaction.sourceWalletId);
+      setTargetWalletId(editingTransaction.targetWalletId || (wallets[1]?.id || ''));
+      setCategoryId(editingTransaction.categoryId || (categories[0]?.id || 'food'));
+      setDate(editingTransaction.date);
+      setDescription(editingTransaction.description);
+      setNotes(editingTransaction.notes || '');
+      setAutoDetectedCategory(null);
+      setUserManuallySelectedCategory(true);
+      setErrorMsg('');
+    } else {
+      setType('expense');
+      setAmountStr('');
+      setCurrency(baseCurrency);
+      setSourceWalletId(wallets[0]?.id || '');
+      setTargetWalletId(wallets[1]?.id || '');
+      setCategoryId(categories[0]?.id || 'food');
+      setDate(new Date().toISOString().split('T')[0]);
+      setDescription('');
+      setNotes('');
+      setAutoDetectedCategory(null);
+      setUserManuallySelectedCategory(false);
+      setErrorMsg('');
+    }
+  }, [isTransactionModalOpen, editingTransaction, baseCurrency, wallets, categories]);
+
   if (!isTransactionModalOpen) return null;
 
   const quickAmounts = currency === 'IDR'
     ? [20000, 50000, 100000, 250000, 500000, 1000000]
     : [10, 25, 50, 100, 250, 500];
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleClose = () => {
+    setIsTransactionModalOpen(false);
+    setEditingTransaction(null);
+    setShowConfirmModal(false);
+    setErrorMsg('');
+  };
+
+  const handleDescriptionChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setDescription(val);
+
+    if (type !== 'transfer' && !userManuallySelectedCategory) {
+      const predicted = predictCategory(val, type);
+      if (predicted) {
+        setCategoryId(predicted);
+        setAutoDetectedCategory(predicted);
+      } else {
+        setAutoDetectedCategory(null);
+      }
+    }
+  };
+
+  const handleCategorySelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setCategoryId(e.target.value);
+    setUserManuallySelectedCategory(true);
+    setAutoDetectedCategory(null);
+  };
+
+  // Called when user clicks submit button in the form
+  const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const parsedAmount = parseFloat(amountStr);
     if (isNaN(parsedAmount) || parsedAmount <= 0) {
@@ -59,199 +139,246 @@ export const TransactionModal: React.FC = () => {
       return;
     }
 
-    try {
-      await addTransaction({
-        date,
-        amount: parsedAmount,
-        currency,
-        type,
-        sourceWalletId,
-        targetWalletId: type === 'transfer' ? targetWalletId : undefined,
-        categoryId: type !== 'transfer' ? categoryId : undefined,
-        description: description.trim(),
-        notes: notes.trim() || undefined,
-      });
+    setErrorMsg('');
+    // Open confirmation modal
+    setShowConfirmModal(true);
+  };
 
-      // Reset and close
-      setAmountStr('');
-      setDescription('');
-      setNotes('');
-      setErrorMsg('');
-      setIsTransactionModalOpen(false);
+  // Called when user confirms inside ConfirmationModal
+  const handleConfirmedSave = async () => {
+    const parsedAmount = parseFloat(amountStr);
+    setIsSubmitting(true);
+    try {
+      if (isEditMode && editingTransaction) {
+        await updateTransaction(editingTransaction.id, {
+          date,
+          amount: parsedAmount,
+          currency,
+          type,
+          sourceWalletId,
+          targetWalletId: type === 'transfer' ? targetWalletId : undefined,
+          categoryId: type !== 'transfer' ? categoryId : undefined,
+          description: description.trim(),
+          notes: notes.trim() || undefined,
+        });
+      } else {
+        await addTransaction({
+          date,
+          amount: parsedAmount,
+          currency,
+          type,
+          sourceWalletId,
+          targetWalletId: type === 'transfer' ? targetWalletId : undefined,
+          categoryId: type !== 'transfer' ? categoryId : undefined,
+          description: description.trim(),
+          notes: notes.trim() || undefined,
+        });
+      }
+
+      handleClose();
     } catch (err) {
-      setErrorMsg('Gagal menyimpan transaksi. Coba lagi.');
+      console.error(err);
+      setErrorMsg('Gagal memproses transaksi. Coba lagi.');
+      setShowConfirmModal(false);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
+  // Category name display helper
+  const currentCategoryObj = categories.find((c) => c.id === categoryId);
+  const currentCategoryName = currentCategoryObj 
+    ? (language === 'en' ? currentCategoryObj.nameEn : currentCategoryObj.name) 
+    : categoryId;
+
+  const sourceWalletObj = wallets.find((w) => w.id === sourceWalletId);
+  const targetWalletObj = wallets.find((w) => w.id === targetWalletId);
+
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-200">
-      <div 
-        className="w-full max-w-lg rounded-t-3xl sm:rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-900 max-h-[92vh] overflow-y-auto"
-        role="dialog"
-        aria-modal="true"
-      >
-        {/* Mobile Drag Indicator */}
-        <div className="w-10 h-1 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto mb-3 sm:hidden" />
+    <>
+      <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-200">
+        <div 
+          className="w-full max-w-lg rounded-t-3xl sm:rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-900 max-h-[92vh] overflow-y-auto"
+          role="dialog"
+          aria-modal="true"
+        >
+          {/* Mobile Drag Indicator */}
+          <div className="w-10 h-1 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto mb-3 sm:hidden" />
 
-        <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-          <h2 className="text-base font-bold text-slate-900 dark:text-white">
-            {t.transactionModalTitle}
-          </h2>
-          <button
-            onClick={() => setIsTransactionModalOpen(false)}
-            aria-label="Tutup"
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-
-        {errorMsg && (
-          <div className="mt-3 rounded-lg bg-rose-50 p-2.5 text-xs font-semibold text-rose-600 dark:bg-rose-950/40 dark:text-rose-300">
-            {errorMsg}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="mt-4 space-y-4">
-          {/* Segmented Type Control */}
-          <div className="grid grid-cols-3 gap-1 rounded-xl bg-slate-100 p-1 dark:bg-slate-800">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+            <div className="flex items-center gap-2">
+              {isEditMode ? (
+                <Edit3 className="h-5 w-5 text-blue-500" />
+              ) : (
+                <Tag className="h-5 w-5 text-blue-500" />
+              )}
+              <h2 className="text-base font-bold text-slate-900 dark:text-white">
+                {isEditMode ? t.editTransactionModalTitle : t.transactionModalTitle}
+              </h2>
+            </div>
             <button
-              type="button"
-              onClick={() => { setType('expense'); setErrorMsg(''); }}
-              className={`flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-bold transition-all ${
-                type === 'expense'
-                  ? 'bg-rose-500 text-white shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
-              }`}
+              onClick={handleClose}
+              aria-label="Tutup"
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200 cursor-pointer"
             >
-              <ArrowUpRight className="h-4 w-4" />
-              <span>{t.typeExpense}</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => { setType('income'); setErrorMsg(''); }}
-              className={`flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-bold transition-all ${
-                type === 'income'
-                  ? 'bg-emerald-500 text-white shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
-              }`}
-            >
-              <ArrowDownLeft className="h-4 w-4" />
-              <span>{t.typeIncome}</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => { setType('transfer'); setErrorMsg(''); }}
-              className={`flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-bold transition-all ${
-                type === 'transfer'
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
-              }`}
-            >
-              <ArrowLeftRight className="h-4 w-4" />
-              <span>{t.typeTransfer}</span>
+              <X className="h-5 w-5" />
             </button>
           </div>
 
-          {/* Amount and Currency Input */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-              {t.amount}
-            </label>
-            <div className="flex rounded-xl border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800/80 focus-within:ring-2 focus-within:ring-blue-500">
-              <select
-                value={currency}
-                onChange={(e) => setCurrency(e.target.value as SupportedCurrency)}
-                className="h-12 border-r border-slate-200 bg-transparent px-3 text-xs font-bold text-slate-800 dark:border-slate-700 dark:text-slate-200 focus:outline-none"
+          {errorMsg && (
+            <div className="mt-3 rounded-lg bg-rose-50 p-2.5 text-xs font-semibold text-rose-600 dark:bg-rose-950/40 dark:text-rose-300">
+              {errorMsg}
+            </div>
+          )}
+
+          <form onSubmit={handleFormSubmit} className="mt-4 space-y-4">
+            {/* Segmented Type Control */}
+            <div className="grid grid-cols-3 gap-1 rounded-xl bg-slate-100 p-1 dark:bg-slate-800">
+              <button
+                type="button"
+                onClick={() => { setType('expense'); setErrorMsg(''); }}
+                className={`flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-bold transition-all cursor-pointer ${
+                  type === 'expense'
+                    ? 'bg-rose-500 text-white shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
+                }`}
               >
-                <option value="IDR">IDR (Rp)</option>
-                <option value="USD">USD ($)</option>
-                <option value="EUR">EUR (€)</option>
-                <option value="SGD">SGD (S$)</option>
-                <option value="MYR">MYR (RM)</option>
-                <option value="JPY">JPY (¥)</option>
-                <option value="GBP">GBP (£)</option>
-                <option value="AUD">AUD (A$)</option>
-              </select>
-              <input
-                type="number"
-                step="any"
-                inputMode="decimal"
-                value={amountStr}
-                onChange={(e) => setAmountStr(e.target.value)}
-                placeholder="0"
-                required
-                className="h-12 w-full bg-transparent px-3 text-lg font-mono font-bold text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none tabular-nums"
-              />
+                <ArrowUpRight className="h-4 w-4" />
+                <span>{t.typeExpense}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => { setType('income'); setErrorMsg(''); }}
+                className={`flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-bold transition-all cursor-pointer ${
+                  type === 'income'
+                    ? 'bg-emerald-500 text-white shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
+                }`}
+              >
+                <ArrowDownLeft className="h-4 w-4" />
+                <span>{t.typeIncome}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => { setType('transfer'); setErrorMsg(''); }}
+                className={`flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-bold transition-all cursor-pointer ${
+                  type === 'transfer'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
+                }`}
+              >
+                <ArrowLeftRight className="h-4 w-4" />
+                <span>{t.typeTransfer}</span>
+              </button>
             </div>
 
-            {/* Quick Amount Chips */}
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {quickAmounts.map((q) => (
-                <button
-                  key={q}
-                  type="button"
-                  onClick={() => setAmountStr(q.toString())}
-                  className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-mono font-medium text-slate-600 hover:border-blue-400 hover:text-blue-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 transition-colors tabular-nums"
-                >
-                  +{q >= 1000 ? `${q / 1000}k` : q}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Description */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-              {t.description}
-            </label>
-            <div className="flex items-center rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-800/80">
-              <FileText className="h-4 w-4 text-slate-400 mr-2 shrink-0" />
-              <input
-                type="text"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="cth: Makan Siang, Bensin, Gaji, dll."
-                required
-                className="w-full bg-transparent text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none"
-              />
-            </div>
-          </div>
-
-          {/* Wallets & Category */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {/* Source Wallet */}
+            {/* Amount and Currency Input */}
             <div>
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                {type === 'transfer' ? t.fromWallet : t.fromWallet}
+                {t.amount}
               </label>
-              <div className="flex items-center rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-800/80">
-                <Wallet className="h-4 w-4 text-slate-400 mr-2 shrink-0" />
+              <div className="flex rounded-xl border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800/80 focus-within:ring-2 focus-within:ring-blue-500">
                 <select
-                  value={sourceWalletId}
-                  onChange={(e) => setSourceWalletId(e.target.value)}
-                  className="w-full bg-transparent text-xs font-semibold text-slate-900 dark:text-white focus:outline-none cursor-pointer"
+                  value={currency}
+                  onChange={(e) => setCurrency(e.target.value as SupportedCurrency)}
+                  className="h-12 border-r border-slate-200 bg-transparent px-3 text-xs font-bold text-slate-800 dark:border-slate-700 dark:text-slate-200 focus:outline-none cursor-pointer"
                 >
-                  {wallets.map((w) => (
-                    <option key={w.id} value={w.id} className="dark:bg-slate-900">
-                      {w.name} ({w.currency})
-                    </option>
-                  ))}
+                  <option value="IDR" className="dark:bg-slate-900">IDR (Rp)</option>
+                  <option value="USD" className="dark:bg-slate-900">USD ($)</option>
+                  <option value="EUR" className="dark:bg-slate-900">EUR (€)</option>
+                  <option value="SGD" className="dark:bg-slate-900">SGD (S$)</option>
+                  <option value="MYR" className="dark:bg-slate-900">MYR (RM)</option>
+                  <option value="JPY" className="dark:bg-slate-900">JPY (¥)</option>
+                  <option value="GBP" className="dark:bg-slate-900">GBP (£)</option>
+                  <option value="AUD" className="dark:bg-slate-900">AUD (A$)</option>
                 </select>
+                <input
+                  type="number"
+                  step="any"
+                  inputMode="decimal"
+                  value={amountStr}
+                  onChange={(e) => setAmountStr(e.target.value)}
+                  placeholder="0"
+                  required
+                  className="h-12 w-full bg-transparent px-3 text-lg font-mono font-bold text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none tabular-nums"
+                />
+              </div>
+
+              {/* Quick Amount Chips */}
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {quickAmounts.map((q) => (
+                  <button
+                    key={q}
+                    type="button"
+                    onClick={() => setAmountStr(q.toString())}
+                    className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-mono font-medium text-slate-600 hover:border-blue-400 hover:text-blue-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 transition-colors tabular-nums cursor-pointer"
+                  >
+                    +{q >= 1000 ? `${q / 1000}k` : q}
+                  </button>
+                ))}
               </div>
             </div>
 
-            {/* Target Wallet (if transfer) OR Category */}
-            {type === 'transfer' ? (
+            {/* Description with Auto-Category Trigger */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  {t.description}
+                </label>
+                {type !== 'transfer' && (
+                  <span className="text-[10px] text-blue-600 dark:text-blue-400 font-medium flex items-center gap-1">
+                    <Sparkles className="h-3 w-3" />
+                    <span>Auto-kategori aktif</span>
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-800/80 focus-within:ring-2 focus-within:ring-blue-500">
+                <FileText className="h-4 w-4 text-slate-400 mr-2 shrink-0" />
+                <input
+                  type="text"
+                  value={description}
+                  onChange={handleDescriptionChange}
+                  placeholder="cth: Makan Padang, Bensin Pertamax, Tagihan Listrik, Gaji"
+                  required
+                  className="w-full bg-transparent text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none"
+                />
+              </div>
+
+              {/* Auto-Category Highlight Chip */}
+              {autoDetectedCategory && type !== 'transfer' && (
+                <div className="mt-2 flex items-center justify-between rounded-xl bg-blue-50/80 px-3 py-1.5 text-xs text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 border border-blue-200/60 dark:border-blue-800/60 animate-in fade-in duration-200">
+                  <div className="flex items-center gap-1.5 truncate">
+                    <Sparkles className="h-3.5 w-3.5 text-blue-500 shrink-0 animate-pulse" />
+                    <span className="font-medium text-[11px]">
+                      {t.autoDetectedCategory}: <strong className="font-bold underline decoration-blue-400">{currentCategoryName}</strong>
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUserManuallySelectedCategory(true);
+                      setAutoDetectedCategory(null);
+                    }}
+                    className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:underline shrink-0 ml-2 cursor-pointer"
+                  >
+                    {t.changeCategory}
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Wallets & Category */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Source Wallet */}
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  {t.toWallet}
+                  {t.fromWallet}
                 </label>
                 <div className="flex items-center rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-800/80">
-                  <Wallet className="h-4 w-4 text-blue-500 mr-2 shrink-0" />
+                  <Wallet className="h-4 w-4 text-slate-400 mr-2 shrink-0" />
                   <select
-                    value={targetWalletId}
-                    onChange={(e) => setTargetWalletId(e.target.value)}
+                    value={sourceWalletId}
+                    onChange={(e) => setSourceWalletId(e.target.value)}
                     className="w-full bg-transparent text-xs font-semibold text-slate-900 dark:text-white focus:outline-none cursor-pointer"
                   >
                     {wallets.map((w) => (
@@ -262,59 +389,127 @@ export const TransactionModal: React.FC = () => {
                   </select>
                 </div>
               </div>
-            ) : (
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  {t.category}
-                </label>
-                <div className="flex items-center rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-800/80">
-                  <Tag className="h-4 w-4 text-slate-400 mr-2 shrink-0" />
-                  <select
-                    value={categoryId}
-                    onChange={(e) => setCategoryId(e.target.value)}
-                    className="w-full bg-transparent text-xs font-semibold text-slate-900 dark:text-white focus:outline-none cursor-pointer"
-                  >
-                    {categories
-                      .filter((c) => (type === 'income' ? c.type === 'income' : c.type === 'expense'))
-                      .map((c) => (
-                        <option key={c.id} value={c.id} className="dark:bg-slate-900">
-                          {language === 'en' ? c.nameEn : c.name}
+
+              {/* Target Wallet (if transfer) OR Category */}
+              {type === 'transfer' ? (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    {t.toWallet}
+                  </label>
+                  <div className="flex items-center rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-800/80">
+                    <Wallet className="h-4 w-4 text-blue-500 mr-2 shrink-0" />
+                    <select
+                      value={targetWalletId}
+                      onChange={(e) => setTargetWalletId(e.target.value)}
+                      className="w-full bg-transparent text-xs font-semibold text-slate-900 dark:text-white focus:outline-none cursor-pointer"
+                    >
+                      {wallets.map((w) => (
+                        <option key={w.id} value={w.id} className="dark:bg-slate-900">
+                          {w.name} ({w.currency})
                         </option>
                       ))}
-                  </select>
+                    </select>
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
-
-          {/* Date Picker */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-              {t.date}
-            </label>
-            <div className="flex items-center rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-800/80">
-              <Calendar className="h-4 w-4 text-slate-400 mr-2 shrink-0" />
-              <input
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                required
-                className="w-full bg-transparent text-xs font-semibold text-slate-900 dark:text-white focus:outline-none"
-              />
+              ) : (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    {t.category}
+                  </label>
+                  <div className="flex items-center rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-800/80">
+                    <Tag className="h-4 w-4 text-slate-400 mr-2 shrink-0" />
+                    <select
+                      value={categoryId}
+                      onChange={handleCategorySelectChange}
+                      className="w-full bg-transparent text-xs font-semibold text-slate-900 dark:text-white focus:outline-none cursor-pointer"
+                    >
+                      {categories
+                        .filter((c) => (type === 'income' ? c.type === 'income' : c.type === 'expense'))
+                        .map((c) => (
+                          <option key={c.id} value={c.id} className="dark:bg-slate-900">
+                            {language === 'en' ? c.nameEn : c.name}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                </div>
+              )}
             </div>
-          </div>
 
-          {/* Submit Action */}
-          <div className="pt-2">
-            <button
-              type="submit"
-              className="flex w-full items-center justify-center rounded-xl bg-blue-600 py-3 text-xs font-bold text-white shadow-md shadow-blue-600/30 hover:bg-blue-500 active:scale-[0.99] transition-all"
-            >
-              {t.saveTransaction}
-            </button>
-          </div>
-        </form>
+            {/* Date Picker */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                {t.date}
+              </label>
+              <div className="flex items-center rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-800/80">
+                <Calendar className="h-4 w-4 text-slate-400 mr-2 shrink-0" />
+                <input
+                  type="date"
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                  required
+                  className="w-full bg-transparent text-xs font-semibold text-slate-900 dark:text-white focus:outline-none"
+                />
+              </div>
+            </div>
+
+            {/* Notes */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                {t.notes} <span className="text-slate-400 font-normal">({language === 'id' ? 'Opsional' : 'Optional'})</span>
+              </label>
+              <div className="flex items-center rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-800/80">
+                <input
+                  type="text"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="cth: Bersama teman, nomor struk, dll."
+                  className="w-full bg-transparent text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none"
+                />
+              </div>
+            </div>
+
+            {/* Submit Action */}
+            <div className="pt-2">
+              <button
+                type="submit"
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 py-3 text-xs font-bold text-white shadow-md shadow-blue-600/30 hover:bg-blue-500 active:scale-[0.99] transition-all cursor-pointer"
+              >
+                {isEditMode ? (
+                  <>
+                    <Edit3 className="h-4 w-4" />
+                    <span>{language === 'id' ? 'Simpan Perubahan Transaksi' : 'Save Changes'}</span>
+                  </>
+                ) : (
+                  <span>{t.saveTransaction}</span>
+                )}
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
-    </div>
+
+      {/* Confirmation Modal before applying changes */}
+      <ConfirmationModal
+        isOpen={showConfirmModal}
+        title={isEditMode ? t.confirmEditTransactionTitle : (type === 'transfer' ? t.confirmTransferTitle : 'Konfirmasi Catat Transaksi')}
+        message={isEditMode ? t.confirmEditTransactionDesc : (type === 'transfer' ? t.confirmTransferDesc : 'Pastikan rincian transaksi Anda sudah tepat sebelum disimpan ke database.')}
+        confirmText={isEditMode ? 'Simpan Perubahan' : 'Ya, Catat Sekarang'}
+        cancelText={t.cancel}
+        variant={isEditMode ? 'warning' : 'primary'}
+        isLoading={isSubmitting}
+        onConfirm={handleConfirmedSave}
+        onCancel={() => setShowConfirmModal(false)}
+        details={[
+          { label: 'Tipe', value: type === 'expense' ? t.typeExpense : type === 'income' ? t.typeIncome : t.typeTransfer },
+          { label: 'Keterangan', value: description },
+          { label: 'Nominal', value: formatCurrency(parseFloat(amountStr) || 0, currency) },
+          { label: 'Dompet Asal', value: sourceWalletObj?.name || '-' },
+          ...(type === 'transfer' ? [{ label: 'Dompet Tujuan', value: targetWalletObj?.name || '-' }] : []),
+          ...(type !== 'transfer' ? [{ label: 'Kategori', value: currentCategoryName }] : []),
+          { label: 'Tanggal', value: date },
+        ]}
+      />
+    </>
   );
 };

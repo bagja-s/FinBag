@@ -1,157 +1,87 @@
-# FinBag - Aplikasi PWA Pencatat Keuangan Personal Multi-User, Multi-Bahasa & Multi-Mata Uang
+# FinBag - Penyederhanaan Top Navbar pada Perangkat Mobile (Mobile Header Decluttering)
 
-Aplikasi Progressive Web App (PWA) pencatat keuangan personal modern bernama **FinBag**, dibangun dengan filosofi desain **Mobile-First** yang ergonomis dan elegan berestetika **Eksekutif Navy**. Mendukung akses **Multi-User & Multi-Device**, **Multi-Bahasa (Indonesian & English)**, serta **Multi-Currency** dengan pembaruan kurs valuta asing secara **Real-Time**.
+Rencana optimasi antarmuka untuk merapikan navbar atas (`TopBar.tsx`) pada layar HP/mobile agar tidak sesak, bersih, dan sesuai standar aplikasi finansial modern.
 
 ---
 
 ### User Review & Critical Decisions
 
 > [!IMPORTANT]
-> Seluruh parameter spesifikasi aplikasi dan rekomendasi fitur strategis telah dirangkum:
+> **Masalah Saat Ini**:
+> Pada layar mobile (< 640px), navbar atas dijejali oleh 5 elemen kontrol sekaligus di sebelah logo:
+> 1. Pilihan Mata Uang (`<select>` IDR, USD, EUR, dsb.)
+> 2. Tombol Ganti Bahasa (`ID / EN`)
+> 3. Tombol Ganti Tema (Dark / Light)
+> 4. Tombol Kunci Aplikasi (PIN Lock)
+> 5. Tombol Profil Pengguna / Masuk Google
+>
+> Hal ini menyebabkan navbar terlihat sangat padat, sempit, berdesakan, dan rentan salah sentuh (*fat-finger error*).
 
-- **Nama Resmi Aplikasi**: **FinBag** (*Finance in your Bag*).
-- **Arsitektur PWA Mobile-First**:
-  - Dioptimalkan khusus untuk pengoperasian satu tangan pada layar sentuh smartphone (*natural thumb-zone* 375px–430px) dengan *Fixed Bottom Navigation Bar*, *Floating Quick Add Action Button*, dan *Bottom Sheet Drawer*.
-  - Layout responsif adaptif: bertransformasi mulus ke tampilan dasbor eksekutif dengan sidebar di layar tablet/desktop tanpa distorsi.
-  - PWA installable: *Service Worker*, Web App Manifest (`standalone`), ikon adaptif 192px/512px, serta komponen tombol instalasi langsung (*In-App Install Prompt* untuk Android, Windows, Mac, dan panduan iOS).
-- **Multi-User & Multi-Device Sync**:
-  - Integrasi Firebase Authentication (Google Sign-In) untuk akun unik tiap pengguna.
-  - Sinkronisasi Cloud Firestore instan lintas perangkat (`/users/{userId}/...`) dengan pembaruan real-time saat transaksi dimasukkan dari smartphone maupun laptop.
-  - *Guest & Offline Mode*: pengguna dapat langsung memakai aplikasi seketika tanpa harus login terlebih dahulu, dengan opsi sinkronisasi ke cloud kapan saja.
-- **Multi-Bahasa (Bilingual ID & EN)**:
-  - Antarmuka dwibahasa penuh: Bahasa Indonesia (ID) dan English (EN) dengan tombol pengubah instan di bar atas dan menu pengaturan.
-  - Seluruh label, kategori, format tanggal, dan pesan status otomatis menyesuaikan bahasa terpilih.
-- **Sistem Multi-Mata Uang & Kurs Real-Time**:
-  - Pilihan Base Currency: IDR (Rp), USD ($), EUR (€), SGD (S$), MYR (RM), JPY (¥), GBP (£), dan AUD (A$).
-  - *Live Exchange Rate Engine*: Pengambilan kurs valuta asing terkini secara langsung via open exchange API publik dengan sistem caching offline.
-  - *Multi-Currency Wallets*: Setiap dompet dapat memiliki mata uang aslinya sendiri, dengan konversi agregat otomatis ke mata uang utama pada metrik Net Worth.
-  - *Currency Converter*: Alat kalkulator konversi kurs instan di dalam aplikasi.
-- **Fitur Finansial Inti**:
-  - Multi-dompet: Tunai, Rekening Bank, dan E-Wallet dengan fitur transfer antar-dompet.
-  - Anggaran Kategori Dinamis: Pemantauan pagu bulanan dengan visual progress bar dan status overbudget.
-  - Transaksi Berulang & Filter: Pengelolaan tagihan rutin berkala dan ekspor laporan CSV/JSON.
-  - Estetika Eksekutif Navy: Nuansa biru tua perbankan profesional dengan dukungan penuh mode Gelap (Dark) dan Terang (Light).
+#### Solusi yang Diusulkan:
+- **Tampilan Mobile (`< sm` / layar ponsel)**:
+  - **Kiri**: Logo FinBag & Nama Aplikasi (bersih dan proporsional).
+  - **Kanan**: Hanya menyisakan **1 tombol ringkas & elegan**:
+    - Tombol Avatar / Profil Pengguna (atau ikon Pengaturan Ringkas `SlidersHorizontal` / `User`).
+    - Jika pengguna belum login: tombol ringkas "Masuk" / icon akun.
+  - **Menu Sheet Mobile Terpadu (Mobile Quick Preferences Popover/Sheet)**:
+    - Ketika tombol di kanan atas disentuh, terbuka menu popover/bottom sheet modern yang menampung:
+      - **Profil & Akun**: Nama, email, dan tombol Masuk / Keluar.
+      - **Pilihan Mata Uang Utama**: Grid tombol pilihan mata uang (IDR, USD, EUR, SGD, MYR, dll.) yang nyaman disentuh jari (touch-friendly).
+      - **Ganti Bahasa**: Pilihan Indonesia (ID) & English (EN).
+      - **Mode Tampilan**: Toggle Mode Gelap / Terang yang jelas.
+      - **Keamanan Aplikasi**: Tombol "Kunci Aplikasi Sekarang" (jika PIN aktif).
+      - **Pasang Aplikasi (PWA)**: Opsi pasang aplikasi ke home screen jika tersedia.
+- **Tampilan Desktop (`sm:` dan `md:` / layar komputer)**:
+  - Tetap mempertahankan seluruh kontrol inline seperti saat ini tanpa perubahan apa pun, sehingga navigasi 1-klik di desktop tetap cepat dan nyaman.
 
 ---
 
 ### 1. Overview & Core Concept
-
-- **Apa yang Dilakukan**: **FinBag** menyediakan asisten keuangan digital terpadu dalam genggaman yang dapat diinstal langsung ke homescreen, mendukung pencatatan pengeluaran harian, transfer saldo antar-rekening, pelacakan anggaran bulanan, dan konversi kurs mata uang global secara real-time.
-- **Target Pengguna**: Individu aktif, profesional, freelancer penerima mata uang ganda, serta keluarga yang menginginkan aplikasi pencatat keuangan yang cepat, aman, responsif, dan dapat diakses dari berbagai gadget sekaligus.
-- **Nilai Utama**: Fleksibilitas tinggi (multi-dompet, multi-mata uang, multi-bahasa), tampilan visual premium, dan privasi penuh dengan isolasi data tingkat cloud.
-
----
-
-### 2. User Experience & Visual Design (Mobile-First)
-
-#### Navigasi & Ergonomi Mobile-First
-- **Top App Bar Eksekutif**:
-  - Logo wordmark **FinBag**, indikator status koneksi (Online/Offline), tombol beralih bahasa (`ID` / `EN`), pemilih mata uang utama (`IDR`, `USD`, dll.), dan profil akun pengguna.
-- **Bilah Navigasi Bawah (Fixed Bottom Tab Bar)**:
-  - Ditempatkan di zona jangkauan jempol paling nyaman:
-    1. **Ringkasan (Home)**: Kartu Net Worth multi-kurs, kartu dompet geser, diagram donat kategori, dan ringkasan pengeluaran harian.
-    2. **Dompet (Wallets)**: Daftar dompet aktif berikon bendera mata uang, rincian mutasi saldo, dan formulir transfer antar-dompet.
-    3. **[+] Tombol Tambah Cepat (Center Action Button)**: Membuka Bottom Sheet transisi halus untuk mencatat transaksi dengan keypad kalkulator instan.
-    4. **Kurs Live (FX Rates)**: Tabel kurs valuta asing real-time, grafik tren valas, dan kalkulator konversi mata uang terintegrasi.
-    5. **Fitur Lebih (More Tools)**: Target Tabungan (Goals), Evaluasi Rasio 50/30/20, Anggaran Kategori, Filter Transaksi, Ekspor CSV/JSON, dan tombol instalasi PWA.
-
-#### Tampilan Eksekutif Navy
-- **Palet Warna**:
-  - Canvas: Deep Navy Blue (`#0B132B` / `#0A192F`) pada mode Gelap, Crisp Slate White (`#F8FAFC`) pada mode Terang.
-  - Surface Card: Rich Navy Slate (`#112240` / `#1E293B`) dengan hairline border presisi.
-  - Aksen Primer: Royal Sapphire (`#2563EB` / `#3B82F6`) untuk aksi utama dan tab aktif.
-  - Indikator Finansial: Emerald Green (`#10B981`) untuk pemasukan/penguatan kurs; Crimson Red (`#EF4444`) untuk pengeluaran/overbudget; Amber Gold (`#F59E0B`) untuk peringatan mendekati pagu belanja.
-- **Tipografi**:
-  - Teks & Judul: *Plus Jakarta Sans* untuk keterbacaan tajam pada layar sentuh.
-  - Angka & Metrik: *Monospace Tabular Figures* (`tabular-nums`) untuk penjajaran angka nominal yang presisi.
+- **Tujuan**: Menghadirkan antarmuka mobile yang bersih (*minimalist & uncluttered*), berestetika tinggi ala aplikasi perbankan modern, tanpa mengurangi fungsi apa pun yang sudah ada.
+- **Dampak**: 
+  - Ruang pandang di mobile menjadi jauh lebih lapang.
+  - Navigasi preferensi pengguna menjadi jauh lebih mudah dioperasikan dengan satu tangan.
+  - Tampilan desktop tetap 100% konsisten dan fungsional.
 
 ---
 
-### 3. Rekomendasi Fitur Strategis Bernilai Tinggi (Saran Pengembangan)
-
-Sebagai pengembang profesional, berikut 4 fitur tambahan yang sangat direkomendasikan untuk menjadikan FinBag aplikasi finansial kelas atas yang sangat berguna dan dicintai pengguna:
-
-1. **Target Tabungan & Celengan Impian (Financial Goals / Savings Pots)**:
-   - Memungkinkan pengguna membuat target tabungan tertentu (misal: "Dana Darurat 6 Bulan", "Liburan ke Jepang", "Beli Gadget Baru").
-   - Pengguna dapat menyisihkan dana dari dompet tertentu ke pos target tabungan dengan indikator visual persentase progres pencapaian dan estimasi sisa waktu.
-2. **Analisis Kesehatan Finansial & Rasio Anggaran 50/30/20**:
-   - Menghitung secara otomatis proporsi pengeluaran pengguna ke dalam 3 pilar:
-     - **50% Kebutuhan Pokok (Needs)**: Makanan, sewa/rumah, listrik, air, transportasi rutin.
-     - **30% Keinginan (Wants)**: Hiburan, belanja hobi, nongkrong/kuliner rekreasional.
-     - **20% Tabungan & Investasi (Savings)**: Dana darurat, investasi, tabungan masa depan.
-   - Memberikan skor kesehatan keuangan instan (*Financial Health Score*) untuk panduan alokasi dana yang sehat.
-3. **Kalkulator Bagi Tagihan Instan (Split Bill Calculator)**:
-   - Sangat berguna untuk gaya hidup sosial (makan bersama teman/keluarga). Pengguna dapat memasukkan total tagihan, persentase pajak & service charge, jumlah orang, lalu membagi nominal secara adil.
-   - Hasil bagian pengguna dapat langsung dimasukkan ke riwayat pengeluaran FinBag dengan 1 ketukan.
-4. **Fitur Keamanan Kunci Aplikasi (App PIN Lock)**:
-   - Opsi mengaktifkan kode PIN 4 digit untuk membuka aplikasi saat dibuka di ponsel, memastikan kerahasiaan catatan keuangan tetap terlindungi saat ponsel dipinjam orang lain.
-
----
-
-### 4. Technical Architecture & Data Strategy
-
-#### Diagram Arsitektur FinBag Lengkap
+### 2. User Experience & Visual Comparison
 
 ```
-┌────────────────────────────────────────────────────────────────────────┐
-│                        FinBag PWA Container                            │
-│  ├── Service Worker & Manifest (Offline App Shell, PWA Install Hook)   │
-│  ├── CurrencyRateService (Real-Time Live FX Rates + Local Fallback)    │
-│  ├── I18nContext (Bilingual ID/EN Reactive Dictionary)                 │
-│  └── SecurityLockContext (Optional 4-Digit Privacy PIN)                │
-├────────────────────────────────────────────────────────────────────────┤
-│                           App.tsx (Root)                               │
-│  ├── AuthProvider (Firebase Auth: Google Sign-In & Offline Guest Mode) │
-│  ├── CurrencyProvider (Base Currency Selection & Conversion Helpers)   │
-│  ├── ThemeProvider (Dark / Light Mode - Executive Navy Palette)        │
-│  └── FinanceSyncProvider (Firestore Real-time Subscriptions + Cache)   │
-├────────────────────────────────────────────────────────────────────────┤
-│                       Mobile-First Presentation                        │
-│  ├── Top Bar (FinBag Brand · FX Ticker · Language Switch · Currency)   │
-│  ├── Viewport Canvas:                                                  │
-│  │    ├── Tab 'Ringkasan': Multi-Currency Net Worth, Carousel, Donut   │
-│  │    ├── Tab 'Dompet': Wallets with Currency Flags, Balance, Transfer │
-│  │    ├── Tab 'Kurs Live': Real-Time FX Table & Currency Converter     │
-│  │    ├── Tab 'Anggaran': Pagu Belanja Kategori & Status Overbudget    │
-│  │    └── Tab 'Alat & Lainnya': Target Tabungan, Rasio 50/30/20,       │
-│  │                              Split Bill, Filter & Ekspor CSV/JSON   │
-│  └── Fixed Bottom Bar (5 Destination Tabs + Floating [+] Action Button)│
-└────────────────────────────────────────────────────────────────────────┘
-                 │                                        ▲
-                 │ (Offline / Online Bi-directional Sync) │
-                 ▼                                        │
-┌────────────────────────────────────────────────────────────────────────┐
-│                   Cloud Backend & Persistence Layer                    │
-│  ├── Firebase Auth: Google OAuth Popup Provider                        │
-│  ├── Cloud Firestore Schema:                                           │
-│  │    └── /users/{userId}/wallets/{walletId}                           │
-│  │    └── /users/{userId}/transactions/{txnId}                         │
-│  │    └── /users/{userId}/budgets/{budgetId}                           │
-│  │    └── /users/{userId}/goals/{goalId} (Target Tabungan)             │
-│  │    └── /users/{userId}/recurring/{recurringId}                      │
-│  └── Security Rules: Strict user-isolation (owner-only read/write)     │
-└────────────────────────────────────────────────────────────────────────┘
+SEBELUM (MOBILE):
+[ [F] FinBag ] [IDR v] [ID] [☀️] [🔒] [👤 Akun] -> Sangat sempit & berdesakan!
+
+SESUDAH (MOBILE):
+[ [F] FinBag ]                          [👤 Profil / ⚙️] -> Sangat bersih & lega!
+                                               │
+                                               ▼
+                              ┌──────────────────────────────────┐
+                              │ 👤 sm.bagja@gmail.com            │
+                              ├──────────────────────────────────┤
+                              │ 💵 Mata Uang Utama: [IDR] [USD]..│
+                              │ 🌐 Bahasa: [Indonesia] [English] │
+                              │ 🌙 Tema: [Terang / Gelap]        │
+                              │ 🔒 Kunci Aplikasi                │
+                              │ 🚪 Keluar Akun                   │
+                              └──────────────────────────────────┘
 ```
 
 ---
 
-### 5. Langkah Eksekusi (Implementation Steps)
+### 3. Rencana Tahapan Eksekusi (Implementation Steps)
 
-1. **Konfigurasi Firebase & PWA**:
-   - Membuka wizard setup Firebase (`show_aistudio_ui` dengan `ui_type: "firebase_setup"`) dan memverifikasi persetujuan untuk Firestore & Auth.
-   - Mengonfigurasi `vite-plugin-pwa`, `manifest.webmanifest`, service worker, dan hook instalasi `usePWAInstall`.
-2. **Modul Kurs Valas & Multi-Bahasa**:
-   - `src/services/currencyService.ts` untuk live exchange rate dan konversi mata uang.
-   - `src/i18n/translations.ts` untuk kamus terstruktur Indonesia & Inggris.
-3. **Logika Murni & Unit Testing**:
-   - `src/utils/financeCalculations.ts` (kalkulasi mutasi saldo, konversi kurs, batas anggaran, rasio 50/30/20, dan progres tabungan).
-   - Menjalankan tes otomatis: `npx --yes tsx --test src/utils/financeCalculations.test.ts`.
-4. **Pengembangan Antarmuka FinBag Mobile-First**:
-   - Komponen Top Header dengan brand FinBag, tombol bahasa, pemilih mata uang, dan status koneksi.
-   - Fixed Bottom Nav ergonomis dengan tab Ringkasan, Dompet, Tambah Cepat, Kurs Live, dan Alat Lainnya.
-   - Bottom Sheet Quick Add dengan kalkulator nominal dan pemilihan mata uang transaksi.
-   - Modul Target Tabungan, Analisis Rasio 50/30/20, dan Kalkulator Split Bill.
-   - Tema Eksekutif Navy dengan transisi Dark/Light mode mulus.
-5. **Verifikasi Kualitas (Ultra Mode)**:
-   - Kompilasi kode bersih (`compile_applet`).
-   - Uji verifikasi visual browser pada layar mobile (390x844) dan desktop (1440x900) via `playwright-cli`.
+1. **Langkah 1: Perbarui Komponen `src/components/TopBar.tsx`**:
+   - Berikan kelas responsif `hidden sm:flex` pada tombol Currency picker, Language button, dan Theme button langsung di header bar.
+   - Perkaya modal/dropdown profil di mobile (`sm:hidden`) sehingga mencakup:
+     - Header info akun pengguna (foto/avatar, nama, email).
+     - Bagian "Preferensi Cepat":
+       - Selector Mata Uang Utama dengan chip tombol yang ramah sentuhan.
+       - Selector Bahasa (ID / EN).
+       - Switch Tema Gelap/Terang.
+       - Tombol Kunci Aplikasi (jika PIN aktif).
+     - Tombol Masuk Google (jika belum login) atau Keluar (jika sudah login).
+2. **Langkah 2: Sinkronisasi Terjemahan (i18n)**:
+   - Pastikan label pada menu preferensi mobile (seperti "Pengaturan Cepat", "Mata Uang Utama", "Tema", "Bahasa") tersedia dalam Bahasa Indonesia dan Bahasa Inggris.
+3. **Langkah 3: Pengujian & Verifikasi**:
+   - Jalankan `compile_applet` dan `lint_applet` untuk menjamin zero compilation & type error.
+   - Buka browser menggunakan `playwright-cli` pada ukuran viewport mobile (390 x 844 px) untuk memverifikasi tampilan navbar mobile yang baru.

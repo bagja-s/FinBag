@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useFinance } from '../../context/FinanceContext';
 import { getTranslation } from '../../i18n/translations';
 import { 
@@ -15,8 +15,12 @@ import {
   Plus, 
   TrendingUp, 
   ChevronRight, 
-  CreditCard 
+  CreditCard,
+  Edit3,
+  Trash2
 } from 'lucide-react';
+import { ConfirmationModal } from '../common/ConfirmationModal';
+import { Transaction } from '../../types/finance';
 
 export const DashboardView: React.FC = () => {
   const { 
@@ -28,8 +32,13 @@ export const DashboardView: React.FC = () => {
     setActiveTab, 
     setIsTransactionModalOpen, 
     setIsAddWalletModalOpen, 
+    openEditTransaction,
+    deleteTransaction,
     language 
   } = useFinance();
+
+  const [txToDelete, setTxToDelete] = useState<Transaction | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const t = getTranslation(language);
 
@@ -278,8 +287,8 @@ export const DashboardView: React.FC = () => {
               const targetWallet = wallets.find((w) => w.id === tx.targetWalletId);
 
               return (
-                <div key={tx.id} className="flex items-center justify-between py-3">
-                  <div className="flex items-center gap-3">
+                <div key={tx.id} className="group flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 py-3 hover:bg-slate-50/60 dark:hover:bg-slate-800/30 rounded-xl px-2 transition-colors">
+                  <div className="flex items-center gap-3 min-w-0">
                     <div className={`flex h-9 w-9 items-center justify-center rounded-xl shrink-0 ${
                       tx.type === 'income'
                         ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400'
@@ -295,8 +304,8 @@ export const DashboardView: React.FC = () => {
                         <ArrowUpRight className="h-4 w-4 rotate-45" />
                       )}
                     </div>
-                    <div>
-                      <p className="text-xs font-bold text-slate-900 dark:text-white truncate max-w-[180px] sm:max-w-xs">
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-slate-900 dark:text-white truncate">
                         {tx.description}
                       </p>
                       <div className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
@@ -306,24 +315,51 @@ export const DashboardView: React.FC = () => {
                         {targetWallet && (
                           <>
                             <span aria-hidden="true">→</span>
-                            <span>{targetWallet.name}</span>
+                            <span className="font-semibold text-blue-600 dark:text-blue-400">{targetWallet.name}</span>
+                          </>
+                        )}
+                        {category && (
+                          <>
+                            <span aria-hidden="true">·</span>
+                            <span className="text-[10px] text-slate-400">{language === 'en' ? category.nameEn : category.name}</span>
                           </>
                         )}
                       </div>
                     </div>
                   </div>
 
-                  <div className="text-right font-mono font-bold text-xs sm:text-sm tabular-nums shrink-0">
-                    <span className={
-                      tx.type === 'income'
-                        ? 'text-emerald-600 dark:text-emerald-400'
-                        : tx.type === 'expense'
-                        ? 'text-rose-600 dark:text-rose-400'
-                        : 'text-blue-600 dark:text-blue-400'
-                    }>
-                      {tx.type === 'income' ? '+' : tx.type === 'expense' ? '-' : ''}
-                      {formatCurrency(tx.amount, tx.currency)}
-                    </span>
+                  <div className="flex items-center justify-between sm:justify-end gap-2.5 shrink-0">
+                    <div className="text-left sm:text-right font-mono font-bold text-xs sm:text-sm tabular-nums shrink-0">
+                      <span className={
+                        tx.type === 'income'
+                          ? 'text-emerald-600 dark:text-emerald-400'
+                          : tx.type === 'expense'
+                          ? 'text-rose-600 dark:text-rose-400'
+                          : 'text-blue-600 dark:text-blue-400'
+                      }>
+                        {tx.type === 'income' ? '+' : tx.type === 'expense' ? '-' : ''}
+                        {formatCurrency(tx.amount, tx.currency)}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => openEditTransaction(tx)}
+                        title="Edit Transaksi"
+                        aria-label={`Edit ${tx.description}`}
+                        className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 rounded-lg transition-colors cursor-pointer"
+                      >
+                        <Edit3 className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        onClick={() => setTxToDelete(tx)}
+                        title="Hapus Transaksi"
+                        aria-label={`Hapus ${tx.description}`}
+                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-colors cursor-pointer"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               );
@@ -331,6 +367,33 @@ export const DashboardView: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Delete Confirmation Modal for Recent Transactions */}
+      <ConfirmationModal
+        isOpen={Boolean(txToDelete)}
+        title={t.confirmDeleteTransactionTitle}
+        message={t.confirmDeleteTransactionDesc}
+        confirmText="Hapus Transaksi"
+        cancelText={t.cancel}
+        variant="danger"
+        isLoading={isDeleting}
+        onConfirm={async () => {
+          if (!txToDelete) return;
+          setIsDeleting(true);
+          try {
+            await deleteTransaction(txToDelete.id);
+            setTxToDelete(null);
+          } finally {
+            setIsDeleting(false);
+          }
+        }}
+        onCancel={() => setTxToDelete(null)}
+        details={txToDelete ? [
+          { label: 'Keterangan', value: txToDelete.description },
+          { label: 'Nominal', value: formatCurrency(txToDelete.amount, txToDelete.currency) },
+          { label: 'Tanggal', value: txToDelete.date },
+        ] : []}
+      />
     </div>
   );
 };
