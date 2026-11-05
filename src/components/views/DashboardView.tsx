@@ -295,9 +295,13 @@ export const DashboardView: React.FC = () => {
               const targetWallet = wallets.find((w) => w.id === tx.targetWalletId);
 
               return (
-                <div key={tx.id} className="group flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 py-3 hover:bg-slate-50/80 dark:hover:bg-slate-800/40 rounded-xl px-2.5 transition-all duration-200 hover:-translate-y-0.5">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className={`flex h-9 w-9 items-center justify-center rounded-xl shrink-0 transition-transform duration-200 group-hover:scale-105 ${
+                <div 
+                  key={tx.id} 
+                  className="group flex items-center justify-between gap-2 py-2 sm:py-2.5 px-1.5 sm:px-2.5 hover:bg-slate-50/80 dark:hover:bg-slate-800/40 rounded-xl transition-all duration-150"
+                >
+                  {/* Left: Icon & Transaction Details */}
+                  <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                    <div className={`flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-xl shrink-0 transition-transform duration-200 group-hover:scale-105 ${
                       tx.type === 'income'
                         ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400'
                         : tx.type === 'expense'
@@ -312,32 +316,34 @@ export const DashboardView: React.FC = () => {
                         <ArrowUpRight className="h-4 w-4 rotate-45" />
                       )}
                     </div>
-                    <div className="min-w-0">
-                      <p className="text-xs font-bold text-slate-900 dark:text-white truncate">
+
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-bold text-slate-900 dark:text-white truncate leading-tight">
                         {tx.description}
                       </p>
-                      <div className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
-                        <span>{tx.date}</span>
+                      <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] text-slate-500 dark:text-slate-400 truncate mt-0.5 font-medium">
+                        <span className="shrink-0">{tx.date}</span>
                         <span aria-hidden="true">·</span>
-                        <span>{wallet?.name || tx.sourceWalletId}</span>
+                        <span className="truncate">{wallet?.name || tx.sourceWalletId}</span>
                         {targetWallet && (
                           <>
                             <span aria-hidden="true">→</span>
-                            <span className="font-semibold text-blue-600 dark:text-blue-400">{targetWallet.name}</span>
+                            <span className="font-semibold text-blue-600 dark:text-blue-400 truncate">{targetWallet.name}</span>
                           </>
                         )}
-                        {category && (
+                        {category && !targetWallet && (
                           <>
-                            <span aria-hidden="true">·</span>
-                            <span className="text-[10px] text-slate-400">{language === 'en' ? category.nameEn : category.name}</span>
+                            <span aria-hidden="true" className="hidden sm:inline">·</span>
+                            <span className="text-[10px] text-slate-400 truncate hidden sm:inline">{language === 'en' ? category.nameEn : category.name}</span>
                           </>
                         )}
                       </div>
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between sm:justify-end gap-2.5 shrink-0">
-                    <div className="text-left sm:text-right font-mono font-bold text-xs sm:text-sm tabular-nums shrink-0">
+                  {/* Right: Amount & Compact Actions */}
+                  <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+                    <div className="text-right font-mono font-bold text-xs sm:text-sm tabular-nums">
                       <span className={
                         tx.type === 'income'
                           ? 'text-emerald-600 dark:text-emerald-400'
@@ -350,22 +356,22 @@ export const DashboardView: React.FC = () => {
                       </span>
                     </div>
 
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center">
                       <button
                         onClick={() => openEditTransaction(tx)}
                         title="Edit Transaksi"
                         aria-label={`Edit ${tx.description}`}
-                        className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 rounded-lg transition-all duration-150 active:scale-90 cursor-pointer"
+                        className="p-1 sm:p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 rounded-lg transition-all duration-150 active:scale-90 cursor-pointer"
                       >
-                        <Edit3 className="h-3.5 w-3.5" />
+                        <Edit3 className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                       </button>
                       <button
                         onClick={() => setTxToDelete(tx)}
                         title="Hapus Transaksi"
                         aria-label={`Hapus ${tx.description}`}
-                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-all duration-150 active:scale-90 cursor-pointer"
+                        className="p-1 sm:p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-all duration-150 active:scale-90 cursor-pointer"
                       >
-                        <Trash2 className="h-3.5 w-3.5" />
+                        <Trash2 className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                       </button>
                     </div>
                   </div>

@@ -1,58 +1,55 @@
-# FinBag - Rencana Implementasi: Manajemen Pengguna di Konsol Admin
+# FinBag - Rencana Implementasi: Optimasi Tampilan List Transaksi Dashboard (Mobile Compact)
 
-**Tujuan**: Memberikan kemampuan penuh kepada Creator / Super Admin (`sm.bagja@gmail.com`) untuk melihat daftar seluruh pengguna terdaftar, memeriksa status dan aktivitas mereka, serta mengelola status akun (Aktif / Ditangguhkan / Hapus Data) langsung dari Konsol Admin.
+**Tujuan**: Merapikan dan membuat daftar transaksi terakhir (*Recent Transactions*) di Dashboard jauh lebih ringkas (*compact*), elegan, dan efisien pada layar perangkat mobile tanpa mengurangi informasi penting atau fitur edit/hapus.
 
 ---
 
-## Arsitektur & Skema Teknis
+## Masalah pada Tampilan Mobile Saat Ini
+1. Container menggunakan `flex-col` pada mobile, sehingga memecah transaksi menjadi 2 baris terpisah (nama & rincian di baris atas, nominal & tombol aksi di baris bawah).
+2. Padding vertikal (`py-3`) dan gap yang terlalu lebar memakan banyak ruang vertikal layar HP.
+3. Metadata teks (`tanggal · dompet · target · kategori`) terlalu panjang dan sering terpotong tidak rapi (*overflow*).
+4. Tombol aksi (Edit & Hapus) memakan tempat signifikan di baris kedua.
 
-### 1. Sinkronisasi Profil Pengguna ke Firestore (`users/{userId}`)
-Setiap kali ada pengguna yang login dengan Google Auth di FinBag, aplikasi secara otomatis mencatat / memperbarui dokumen profil publik mereka:
-- `uid`: string (ID unik dari Firebase Auth)
-- `email`: string
-- `displayName`: string
-- `photoURL`: string
-- `role`: `'creator'` (untuk `sm.bagja@gmail.com`) atau `'user'`
-- `status`: `'active'` | `'suspended'` (default: `'active'`)
-- `createdAt`: ISO string timestamp
-- `lastLoginAt`: ISO string timestamp
-- `baseCurrency`: string (default: `'IDR'`)
-- `language`: string (default: `'id'`)
+---
 
-### 2. Keamanan & Hak Akses Firestore (`firestore.rules`)
-- Admin (`sm.bagja@gmail.com` dengan `email_verified == true`) diberikan hak `allow list, get, update` pada koleksi `/users/{userId}`.
-- Pengguna reguler hanya boleh membaca dan mengubah profil miliknya sendiri (`isOwner(userId)`).
-- Pengguna reguler diblokir untuk memodifikasi field `role` atau `status` mereka sendiri.
+## Rencana Solusi & Perubahan Desain Mobile
 
-### 3. Pengecekan Akun Ditangguhkan (Suspension Enforcement)
-- Jika seorang pengguna ditandai dengan status `suspended` oleh Admin, saat mereka masuk ke aplikasi, akan ditampilkan layar peringatan ramah bahwa akun sedang ditangguhkan oleh Administrator dengan opsi logout atau hubungi bantuan.
+### 1. Desain Single-Row Horizontal (1 Baris Ringkas & Rapi)
+- Mengubah struktur layout dari `flex-col sm:flex-row` menjadi **1 baris horizontal penuh** (`flex items-center justify-between`) baik di mobile maupun desktop.
+- Mengurangi tinggi baris dan padding: dari `py-3 px-2.5` menjadi `py-2 px-1.5 sm:py-2.5 sm:px-2.5`.
+
+### 2. Ukuran Elemen Visual Proporsional
+- **Ikon Kategori/Arah**: Dari `h-9 w-9` menjadi `h-8 w-8` di mobile (`sm:h-9 sm:w-9`) dengan radius rounded yang rapi.
+- **Judul Transaksi**: `text-xs font-semibold text-slate-900 dark:text-white truncate` dengan batas lebar fleksibel agar tidak menabrak nominal.
+- **Sub-informasi (Subtitle)**: Diringkas menjadi format bersih 1 baris:
+  `[Tanggal] · [Dompet/Kategori]` dengan teks `text-[10px] text-slate-400 truncate`.
+
+### 3. Nominal & Aksi Cepat yang Ergonomis
+- **Nominal Transaksi**: Rata kanan (`text-right font-mono font-bold text-xs sm:text-sm tabular-nums`), berwarna hijau untuk pemasukan (+), merah untuk pengeluaran (-), dan biru untuk transfer.
+- **Tombol Edit & Hapus**:
+  - Dibuat ringkas di sebelah kanan nominal (`p-1 text-slate-400 hover:text-blue-500` / `hover:text-rose-500`).
+  - Ukuran ikon `h-3 w-3 sm:h-3.5 sm:w-3.5`, sehingga tetap mudah ditekan (*touch-target* nyaman) namun tidak membuat tata letak berantakan.
+
+---
+
+## Modul yang Akan Dimodifikasi
+- `src/components/views/DashboardView.tsx`: Refaktor JSX item daftar `recentTxs.map(...)` agar mengadopsi format single-line compact modern.
 
 ---
 
 ## Status Implementasi: SELESAI (COMPLETED)
 
-- [x] **Modul 1: Model Data & Sinkronisasi Profil Otomatis (`src/types/finance.ts` & `src/context/FinanceContext.tsx`)**:
-  - Tipe `UserProfile` (`uid`, `email`, `displayName`, `photoURL`, `role`, `status`, `createdAt`, `lastLoginAt`) ditambahkan.
-  - Sinkronisasi metadata otomatis saat login ke Firestore doc `/users/{userId}`.
-  - Listener live untuk seluruh pengguna (`allUsers`) dan fungsi admin: `toggleUserStatus()`, `deleteUserProfile()`, dan `refreshUsers()`.
+- [x] **Format 1 Baris Horizontal (Single-Row Compact)**:
+  - Mengubah layout item transaksi dari `flex-col sm:flex-row` menjadi 1 baris sejajar (`flex items-center justify-between`) di mobile dan desktop.
+  - Padding vertikal dioptimalkan menjadi `py-2 sm:py-2.5` dan padding horizontal `px-1.5 sm:px-2.5`.
+- [x] **Elemen Visual & Tipografi Proporsional**:
+  - Ukuran ikon disesuaikan (`h-8 w-8` di mobile, `h-9 w-9` di desktop).
+  - Judul transaksi terpotong rapi dengan `truncate`.
+  - Subtitle dibuat ringkas: `[Tanggal] · [Dompet]` dengan tag kategori sekunder yang disembunyikan di layar sempit agar tidak tumpang tindih.
+- [x] **Nominal & Tombol Aksi Sejajar**:
+  - Nominal rata kanan dengan warna kontras (+ hijau, - merah, biru).
+  - Tombol Edit & Hapus diletakkan sejajar di samping nominal (`h-3 w-3 sm:h-3.5 sm:w-3.5`) dengan touch-target responsif.
+- [x] **Pengujian & Validasi Kualitas**:
+  - TypeScript typecheck (`pnpm exec tsc --noEmit`): 0 error.
+  - Vite production build: Sukses terbundel tanpa error.
 
-- [x] **Modul 2: Pembaruan Aturan Keamanan (`firestore.rules` & `firebase-blueprint.json`)**:
-  - Helper `isAdmin()` berbasis verifikasi email `sm.bagja@gmail.com`.
-  - Hak `allow list: if isAdmin();` pada `/users`.
-  - Hak `allow update, delete: if isOwner(userId) || isAdmin();`.
-  - Aturan Firestore dideploy dan aktif.
-
-- [x] **Modul 3: Antarmuka Direktori & Manajemen Pengguna di `AdminView.tsx`**:
-  - Counter metrics: Total Pengguna, Pengguna Aktif (hijau), Akun Ditangguhkan (merah).
-  - Search bar interaktif (berdasarkan nama, email, atau UID) dan filter pill (Semua, Aktif, Ditangguhkan).
-  - Kartu baris pengguna dengan avatar, nama, email, badge status dan role (`Creator` vs `User`).
-  - Tombol aksi Tangguhkan / Aktifkan dan Hapus Akun dengan modal konfirmasi (`ConfirmationModal`).
-  - Akun Creator diproteksi secara otomatis agar tidak dapat ditangguhkan/dihapus secara sengaja.
-
-- [x] **Modul 4: Proteksi Akun Ditangguhkan di Tampilan Utama (`App.tsx`)**:
-  - Jika pengguna berstatus `suspended` masuk, aplikasi mengarahkan ke layar pemberitahuan ramah bahwa akun dinonaktifkan sementara oleh Administrator dengan tombol Logout.
-
-- [x] **Modul 5: Pengujian & Validasi Kualitas**:
-  - `pnpm exec tsc --noEmit` lulus dengan 0 error.
-  - `pnpm exec vite build` sukses menghasilkan bundel produksi teroptimasi.
-  - 8/8 unit tests lulus (100%).
