@@ -1,29 +1,69 @@
-# FinBag - Rencana Revisi: Edit/Hapus Dompet, Onboarding Tutorial, Saran PWA & Ikon Aplikasi
+# FinBag - Rencana Implementasi: Manajemen Pengguna di Konsol Admin
 
-Seluruh fitur revisi telah selesai diimplementasikan, diverifikasi, dan diuji dengan sukses.
+**Tujuan**: Memberikan kemampuan penuh kepada Creator / Super Admin (`sm.bagja@gmail.com`) untuk melihat daftar seluruh pengguna terdaftar, memeriksa status dan aktivitas mereka, serta mengelola status akun (Aktif / Ditangguhkan / Hapus Data) langsung dari Konsol Admin.
 
 ---
 
-### Status Implementasi: SELESAI (COMPLETED)
+## Arsitektur & Skema Teknis
 
-- [x] **Modul 1: Ikon Aplikasi PWA Premium**:
-  - Telah dibuat ikon aplikasi FinBag bercorak Executive Leather Wallet dengan sirkuit bercahaya emerald dan emas.
-  - Aset resolusi tinggi tersedia di `public/pwa-192x192.png`, `public/pwa-512x512.png`, `public/apple-touch-icon.png`, dan `public/icon.svg`.
-- [x] **Modul 2: State & Mutasi Dompet di `FinanceContext.tsx`**:
-  - `updateWallet(id, data)` dan `deleteWallet(id)` tersinkronisasi real-time ke Cloud Firestore (`users/{uid}/wallets`).
-  - State `editingWallet`, `openEditWallet`, dan `openAddWallet` beroperasi penuh.
-- [x] **Modul 3: Upgrade Modal Dompet (`AddWalletModal.tsx`)**:
-  - Mendukung mode Tambah dan mode Edit dengan data terisi otomatis dan penyesuaian judul dinamis.
-- [x] **Modul 4: Integrasi Aksi di `WalletsView.tsx`**:
-  - Tombol aksi Edit (`Edit3`) dan Hapus (`Trash2`) pada setiap kartu dompet.
-  - Dialog konfirmasi aman (`ConfirmationModal`) dengan detail saldo dan peringatan sebelum menghapus dompet.
-- [x] **Modul 5: Tutorial Interaktif & Rekomendasi PWA (`OnboardingTutorialModal.tsx` & `PWAInstallBanner.tsx`)**:
-  - Modal onboarding 4-langkah otomatis muncul saat login pertama kali.
-  - Langkah 4 menyajikan rekomendasi instalasi PWA dengan tombol `install()` langsung.
-  - Banner rekomendasi instalasi PWA di dasbor (`PWAInstallBanner.tsx`) yang cerdas dan dapat ditutup.
-  - Tombol "Ulangi Tutorial" tersedia di tab Pengaturan (`ToolsView.tsx`).
-- [x] **Modul 6: Verifikasi & Pengujian Kualitas**:
-  - `compile_applet` (`vite build`) berhasil 100%.
-  - `lint_applet` (`tsc --noEmit`) lulus tanpa error.
-  - Unit test `categoryMatcher.test.ts` (8 dari 8 tes lulus).
-  - Server aktif dan merespons HTTP 200.
+### 1. Sinkronisasi Profil Pengguna ke Firestore (`users/{userId}`)
+Setiap kali ada pengguna yang login dengan Google Auth di FinBag, aplikasi secara otomatis mencatat / memperbarui dokumen profil publik mereka:
+- `uid`: string (ID unik dari Firebase Auth)
+- `email`: string
+- `displayName`: string
+- `photoURL`: string
+- `role`: `'creator'` (untuk `sm.bagja@gmail.com`) atau `'user'`
+- `status`: `'active'` | `'suspended'` (default: `'active'`)
+- `createdAt`: ISO string timestamp
+- `lastLoginAt`: ISO string timestamp
+- `baseCurrency`: string (default: `'IDR'`)
+- `language`: string (default: `'id'`)
+
+### 2. Keamanan & Hak Akses Firestore (`firestore.rules`)
+- Admin (`sm.bagja@gmail.com` dengan `email_verified == true`) diberikan hak `allow list, get, update` pada koleksi `/users/{userId}`.
+- Pengguna reguler hanya boleh membaca dan mengubah profil miliknya sendiri (`isOwner(userId)`).
+- Pengguna reguler diblokir untuk memodifikasi field `role` atau `status` mereka sendiri.
+
+### 3. Pengecekan Akun Ditangguhkan (Suspension Enforcement)
+- Jika seorang pengguna ditandai dengan status `suspended` oleh Admin, saat mereka masuk ke aplikasi, akan ditampilkan layar peringatan ramah bahwa akun sedang ditangguhkan oleh Administrator dengan opsi logout atau hubungi bantuan.
+
+---
+
+## Rincian Modul & Langkah Kerja
+
+### Modul 1: Model Data & Sinkronisasi Profil Otomatis (`src/context/FinanceContext.tsx`)
+- Tambahkan interface `UserProfile` (`uid`, `email`, `displayName`, `photoURL`, `role`, `status`, `createdAt`, `lastLoginAt`).
+- Saat `onAuthStateChanged` mendeteksi pengguna baru atau login kembali:
+  - Lakukan `setDoc(doc(db, 'users', user.uid), { ...profileData }, { merge: true })` agar tidak menimpa status yang sudah diubah admin.
+- Berikan state `allUsers: UserProfile[]` dan fungsi `fetchAllUsers()`, `updateUserStatus(uid, status)`.
+
+### Modul 2: Pembaruan Aturan Keamanan (`firestore.rules` & `firebase-blueprint.json`)
+- Tambahkan helper `isAdmin()` berbasis verifikasi email pembuat aplikasi.
+- Izinkan `allow list: if isAdmin();` pada `/users`.
+- Izinkan `allow update: if isOwner(userId) || isAdmin();` dengan proteksi field `role` dan `status`.
+
+### Modul 3: Antarmuka Direktori Pengguna di `AdminView.tsx`
+- Tambahkan tab/bagian baru **"Manajemen Pengguna" (User Directory)**:
+  - **Statistik Cepat**: Total Pengguna Terdaftar, Pengguna Aktif, Pengguna Ditangguhkan.
+  - **Kotak Pencarian**: Filter cepat berdasarkan nama atau alamat email pengguna.
+  - **Tabel Pengguna**:
+    - Kolom Avatar & Nama Lengkap
+    - Kolom Email & Lencana Verifikasi
+    - Kolom Peran (`CREATOR` emas, `USER` abu-abu)
+    - Kolom Tanggal Bergabung & Terakhir Aktif
+    - Kolom Status Akun (`Active` hijau, `Suspended` merah)
+  - **Aksi Cepat**:
+    - Tombol **Suspend / Aktifkan**: Mengubah status akses akun secara real-time.
+    - Tombol **Hapus Riwayat/Data**: Modal konfirmasi untuk membersihkan data atas permintaan user.
+
+### Modul 4: Proteksi Akun Ditangguhkan di Tampilan Utama (`App.tsx`)
+- Jika user terdeteksi memiliki `status === 'suspended'`, render banner / kartu pemberitahuan akun ditangguhkan yang mengunci aksi penambahan transaksi baru.
+
+### Modul 5: Pengujian & Validasi
+- Jalankan `compile_applet` dan `lint_applet` untuk menjamin tidak ada regresi tipe TypeScript.
+- Uji alur pembuatan akun baru, pembacaan daftar user oleh admin, dan toggle status suspend.
+
+---
+
+## Konfirmasi Pengguna
+Apakah rencana arsitektur di atas sudah sesuai dengan kebutuhan Anda? Silakan klik tombol **Proceed** atau beri instruksi tambahan untuk memulai implementasi.

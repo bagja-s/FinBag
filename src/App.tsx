@@ -14,6 +14,7 @@ import { ExchangeRatesView } from './components/views/ExchangeRatesView';
 import { BudgetsView } from './components/views/BudgetsView';
 import { TransactionsView } from './components/views/TransactionsView';
 import { ToolsView } from './components/views/ToolsView';
+import { AdminView } from './components/views/AdminView';
 import { LoginView } from './components/views/LoginView';
 import { TransactionModal } from './components/modals/TransactionModal';
 import { AddWalletModal } from './components/modals/AddWalletModal';
@@ -23,7 +24,7 @@ import { useOnlineStatus } from './hooks/useOnlineStatus';
 import { WifiOff, Loader2 } from 'lucide-react';
 
 const MainLayout: React.FC = () => {
-  const { user, isAuthLoading, activeTab, appPin, isAppUnlocked } = useFinance();
+  const { user, isAuthLoading, activeTab, appPin, isAppUnlocked, announcementNotice } = useFinance();
   const isOnline = useOnlineStatus();
 
   // 1. Loading state while checking Firebase authentication
@@ -70,6 +71,16 @@ const MainLayout: React.FC = () => {
 
         {/* Viewport Canvas */}
         <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-full overflow-x-hidden min-h-[calc(100vh-3.5rem)]">
+          {/* System Announcement Notice (if set by Creator) */}
+          {announcementNotice && (
+            <div className="mb-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 px-4 py-3 text-xs font-semibold text-amber-800 dark:text-amber-200 flex items-center justify-between shadow-xs">
+              <div className="flex items-center gap-2">
+                <span className="flex h-2 w-2 rounded-full bg-amber-500 animate-ping" />
+                <span>{announcementNotice}</span>
+              </div>
+            </div>
+          )}
+
           <div key={activeTab} className="animate-in fade-in-0 slide-in-from-bottom-3 duration-300 fill-mode-both ease-out">
             {activeTab === 'dashboard' && <DashboardView />}
             {activeTab === 'wallets' && <WalletsView />}
@@ -77,6 +88,7 @@ const MainLayout: React.FC = () => {
             {activeTab === 'budgets' && <BudgetsView />}
             {activeTab === 'transactions' && <TransactionsView />}
             {activeTab === 'tools' && <ToolsView />}
+            {activeTab === 'admin' && <AdminView />}
           </div>
         </main>
       </div>

@@ -17,6 +17,7 @@ export const Sidebar: React.FC = () => {
   const { 
     activeTab, 
     setActiveTab, 
+    isAdmin,
     setIsTransactionModalOpen, 
     language,
     exportCSV,
@@ -71,6 +72,27 @@ export const Sidebar: React.FC = () => {
               </button>
             );
           })}
+
+          {isAdmin && (
+            <div className="pt-2 mt-2 border-t border-slate-100 dark:border-slate-800">
+              <button
+                onClick={() => setActiveTab('admin')}
+                className={`relative flex w-full items-center justify-between rounded-xl px-3.5 py-2.5 text-xs font-semibold transition-all duration-200 cursor-pointer ${
+                  activeTab === 'admin'
+                    ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold translate-x-1 shadow-xs border border-amber-500/30'
+                    : 'text-amber-600 dark:text-amber-400 hover:bg-amber-500/10'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <ShieldAlert className="h-4 w-4 text-amber-500" />
+                  <span>{t.navAdmin}</span>
+                </div>
+                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-400/20 text-amber-600 dark:text-amber-300">
+                  CREATOR
+                </span>
+              </button>
+            </div>
+          )}
         </nav>
       </div>
 

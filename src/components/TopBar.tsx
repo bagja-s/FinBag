@@ -19,12 +19,15 @@ import {
   Globe,
   X,
   SlidersHorizontal,
-  Check
+  Check,
+  ShieldCheck
 } from 'lucide-react';
 
 export const TopBar: React.FC = () => {
   const { 
     user, 
+    isAdmin,
+    setActiveTab,
     loginWithGoogle, 
     logout, 
     language, 
@@ -205,10 +208,29 @@ export const TopBar: React.FC = () => {
             {showUserMenu && user && (
               <div className="absolute right-0 mt-2 w-56 rounded-xl border border-slate-200 bg-white p-2 shadow-xl dark:border-slate-800 dark:bg-slate-900 z-50 animate-in fade-in-0 zoom-in-95 slide-in-from-top-2 duration-200 ease-out origin-top-right">
                 <div className="border-b border-slate-100 px-3 py-2 dark:border-slate-800">
-                  <p className="text-xs font-bold text-slate-900 dark:text-white truncate">{user.displayName}</p>
+                  <div className="flex items-center justify-between gap-1">
+                    <p className="text-xs font-bold text-slate-900 dark:text-white truncate">{user.displayName}</p>
+                    {isAdmin && (
+                      <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-400/20 text-amber-600 dark:text-amber-300">
+                        ADMIN
+                      </span>
+                    )}
+                  </div>
                   <p className="text-[11px] text-slate-500 truncate">{user.email}</p>
                 </div>
                 <div className="py-1">
+                  {isAdmin && (
+                    <button
+                      onClick={() => {
+                        setActiveTab('admin');
+                        setShowUserMenu(false);
+                      }}
+                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/30 transition-colors cursor-pointer"
+                    >
+                      <ShieldCheck className="w-3.5 h-3.5 text-amber-500" />
+                      <span>{t.navAdmin}</span>
+                    </button>
+                  )}
                   <button
                     onClick={() => {
                       logout();
@@ -297,34 +319,56 @@ export const TopBar: React.FC = () => {
             {/* User Profile Card */}
             <div className="mt-4 p-3.5 rounded-2xl bg-slate-50 border border-slate-100 dark:bg-slate-800/60 dark:border-slate-800">
               {user ? (
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3 min-w-0">
-                    {user.photoURL ? (
-                      <img src={user.photoURL} alt="" className="h-10 w-10 rounded-xl object-cover ring-2 ring-blue-500/20" />
-                    ) : (
-                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-sm font-bold text-white shadow-sm">
-                        {user.displayName?.[0] || 'U'}
+                <div>
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      {user.photoURL ? (
+                        <img src={user.photoURL} alt="" className="h-10 w-10 rounded-xl object-cover ring-2 ring-blue-500/20" />
+                      ) : (
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-sm font-bold text-white shadow-sm">
+                          {user.displayName?.[0] || 'U'}
+                        </div>
+                      )}
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                          {user.displayName || 'Pengguna FinBag'}
+                        </p>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                          {user.email}
+                        </p>
                       </div>
-                    )}
-                    <div className="min-w-0">
-                      <p className="text-xs font-bold text-slate-900 dark:text-white truncate">
-                        {user.displayName || 'Pengguna FinBag'}
-                      </p>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
-                        {user.email}
-                      </p>
                     </div>
+                    <button
+                      onClick={() => {
+                        logout();
+                        setShowMobileMenu(false);
+                      }}
+                      className="flex shrink-0 items-center gap-1 rounded-xl bg-rose-50 px-2.5 py-1.5 text-xs font-semibold text-rose-600 hover:bg-rose-100 dark:bg-rose-950/40 dark:text-rose-400 transition-colors"
+                    >
+                      <LogOut className="w-3.5 h-3.5" />
+                      <span>{t.signOut}</span>
+                    </button>
                   </div>
-                  <button
-                    onClick={() => {
-                      logout();
-                      setShowMobileMenu(false);
-                    }}
-                    className="flex shrink-0 items-center gap-1 rounded-xl bg-rose-50 px-2.5 py-1.5 text-xs font-semibold text-rose-600 hover:bg-rose-100 dark:bg-rose-950/40 dark:text-rose-400 transition-colors"
-                  >
-                    <LogOut className="w-3.5 h-3.5" />
-                    <span>{t.signOut}</span>
-                  </button>
+
+                  {isAdmin && (
+                    <div className="mt-2.5 pt-2.5 border-t border-slate-100 dark:border-slate-800">
+                      <button
+                        onClick={() => {
+                          setActiveTab('admin');
+                          setShowMobileMenu(false);
+                        }}
+                        className="flex w-full items-center justify-between rounded-xl bg-amber-500/10 border border-amber-500/30 px-3 py-2 text-xs font-bold text-amber-600 dark:text-amber-400 active:scale-[0.98] transition-transform cursor-pointer"
+                      >
+                        <div className="flex items-center gap-2">
+                          <ShieldCheck className="h-4 w-4 text-amber-500" />
+                          <span>{t.navAdmin}</span>
+                        </div>
+                        <span className="text-[9px] font-bold bg-amber-400/20 px-1.5 py-0.5 rounded text-amber-700 dark:text-amber-300">
+                          CREATOR
+                        </span>
+                      </button>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="flex flex-col gap-2.5">

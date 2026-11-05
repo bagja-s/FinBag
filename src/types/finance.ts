@@ -70,3 +70,17 @@ export interface CurrencyRateInfo {
   flag: string;
   rateToIdr: number;
 }
+
+export interface UserProfile {
+  uid: string;
+  email: string;
+  displayName: string;
+  photoURL?: string;
+  role: 'creator' | 'admin' | 'user';
+  status: 'active' | 'suspended';
+  createdAt: string;
+  lastLoginAt: string;
+  baseCurrency?: SupportedCurrency;
+  language?: SupportedLanguage;
+}
+

@@ -5,7 +5,8 @@ import {
   WalletAccount, 
   Transaction, 
   BudgetCategory, 
-  SavingsGoal 
+  SavingsGoal,
+  UserProfile 
 } from '../types/finance';
 import { 
   INITIAL_WALLETS, 
@@ -43,9 +44,18 @@ import { User } from 'firebase/auth';
 interface FinanceContextType {
   // User & Auth
   user: User | null;
+  currentUserProfile: UserProfile | null;
+  allUsers: UserProfile[];
+  isLoadingUsers: boolean;
+  refreshUsers: () => Promise<void>;
+  toggleUserStatus: (targetUid: string, currentStatus: 'active' | 'suspended') => Promise<void>;
+  deleteUserProfile: (targetUid: string) => Promise<void>;
+  isAdmin: boolean;
   isAuthLoading: boolean;
   loginWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
+  announcementNotice: string | null;
+  setAnnouncementNotice: (msg: string | null) => void;
 
   // Preferences
   language: SupportedLanguage;
@@ -63,8 +73,8 @@ interface FinanceContextType {
   lockApp: () => void;
 
   // Navigation & Modals
-  activeTab: 'dashboard' | 'wallets' | 'rates' | 'tools' | 'budgets' | 'transactions';
-  setActiveTab: (tab: 'dashboard' | 'wallets' | 'rates' | 'tools' | 'budgets' | 'transactions') => void;
+  activeTab: 'dashboard' | 'wallets' | 'rates' | 'tools' | 'budgets' | 'transactions' | 'admin';
+  setActiveTab: (tab: 'dashboard' | 'wallets' | 'rates' | 'tools' | 'budgets' | 'transactions' | 'admin') => void;
   isTransactionModalOpen: boolean;
   setIsTransactionModalOpen: (open: boolean) => void;
   isAddWalletModalOpen: boolean;
@@ -117,6 +127,9 @@ const LOCAL_STORAGE_PREFIX = 'finbag_';
 export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   // Auth state
   const [user, setUser] = useState<User | null>(null);
+  const [currentUserProfile, setCurrentUserProfile] = useState<UserProfile | null>(null);
+  const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
+  const [isLoadingUsers, setIsLoadingUsers] = useState<boolean>(false);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
 
   // App settings
@@ -136,8 +149,24 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
   });
   const [isAppUnlocked, setIsAppUnlocked] = useState<boolean>(() => !localStorage.getItem(`${LOCAL_STORAGE_PREFIX}pin`));
 
+  const ADMIN_EMAILS = ['sm.bagja@gmail.com'];
+  const isAdmin = !!user?.email && ADMIN_EMAILS.includes(user.email.toLowerCase());
+
+  const [announcementNotice, setAnnouncementNoticeState] = useState<string | null>(() => {
+    return localStorage.getItem(`${LOCAL_STORAGE_PREFIX}announcement`);
+  });
+
+  const setAnnouncementNotice = (msg: string | null) => {
+    setAnnouncementNoticeState(msg);
+    if (msg) {
+      localStorage.setItem(`${LOCAL_STORAGE_PREFIX}announcement`, msg);
+    } else {
+      localStorage.removeItem(`${LOCAL_STORAGE_PREFIX}announcement`);
+    }
+  };
+
   // Navigation
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'wallets' | 'rates' | 'tools' | 'budgets' | 'transactions'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'wallets' | 'rates' | 'tools' | 'budgets' | 'transactions' | 'admin'>('dashboard');
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
   const [isAddWalletModalOpen, setIsAddWalletModalOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
@@ -263,9 +292,12 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     return () => unsubscribeAuth();
   }, []);
 
-  // Firestore Sync when user is authenticated - 100% direct database, NO dummy seeding
+    // Firestore Sync when user is authenticated - 100% direct database, NO dummy seeding
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      setCurrentUserProfile(null);
+      return;
+    }
 
     // Trigger onboarding tutorial on first user login
     const hasSeenTutorial = localStorage.getItem(`${LOCAL_STORAGE_PREFIX}onboarding_completed`);
@@ -274,6 +306,55 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     }
 
     const userId = user.uid;
+    const nowIso = new Date().toISOString();
+    const isCreatorEmail = user.email?.toLowerCase() === 'sm.bagja@gmail.com';
+
+    // Synchronize user profile in Firestore
+    const userDocRef = doc(db, 'users', userId);
+    
+    // Listen to current user profile for live status updates (active vs suspended)
+    const unsubscribeProfile = onSnapshot(
+      userDocRef,
+      (docSnap) => {
+        if (docSnap.exists()) {
+          const profileData = docSnap.data() as UserProfile;
+          setCurrentUserProfile(profileData);
+        } else {
+          // Initialize fresh user profile
+          const newProfile: UserProfile = {
+            uid: userId,
+            email: user.email || '',
+            displayName: user.displayName || (user.email?.split('@')[0] || 'Pengguna FinBag'),
+            photoURL: user.photoURL || undefined,
+            role: isCreatorEmail ? 'creator' : 'user',
+            status: 'active',
+            createdAt: nowIso,
+            lastLoginAt: nowIso,
+            baseCurrency,
+            language,
+          };
+          setDoc(userDocRef, cleanFirestoreData(newProfile), { merge: true }).catch(console.warn);
+          setCurrentUserProfile(newProfile);
+        }
+      },
+      (error) => {
+        console.warn('Profile read warning:', error);
+      }
+    );
+
+    // Update lastLoginAt & keep basic info fresh
+    setDoc(
+      userDocRef,
+      cleanFirestoreData({
+        uid: userId,
+        email: user.email || '',
+        displayName: user.displayName || (user.email?.split('@')[0] || 'Pengguna FinBag'),
+        photoURL: user.photoURL || undefined,
+        role: isCreatorEmail ? 'creator' : 'user',
+        lastLoginAt: nowIso,
+      }),
+      { merge: true }
+    ).catch(console.warn);
 
     // Listen to wallets directly from Firestore
     const walletsPath = `users/${userId}/wallets`;
@@ -319,11 +400,106 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     );
 
     return () => {
+      unsubscribeProfile();
       unsubscribeWallets();
       unsubscribeTxs();
       unsubscribeGoals();
     };
   }, [user]);
+
+  // Admin: Listen to all registered users
+  useEffect(() => {
+    if (!isAdmin) {
+      setAllUsers([]);
+      return;
+    }
+
+    setIsLoadingUsers(true);
+    const usersCollection = collection(db, 'users');
+    const unsubscribeAllUsers = onSnapshot(
+      usersCollection,
+      (snapshot) => {
+        const list: UserProfile[] = [];
+        snapshot.forEach((d) => {
+          const val = d.data();
+          list.push({
+            uid: d.id,
+            email: val.email || '',
+            displayName: val.displayName || 'Pengguna FinBag',
+            photoURL: val.photoURL,
+            role: val.role || 'user',
+            status: val.status || 'active',
+            createdAt: val.createdAt || new Date().toISOString(),
+            lastLoginAt: val.lastLoginAt || new Date().toISOString(),
+            baseCurrency: val.baseCurrency,
+            language: val.language,
+          });
+        });
+        // Sort: newest activity first
+        list.sort((a, b) => (b.lastLoginAt || '').localeCompare(a.lastLoginAt || ''));
+        setAllUsers(list);
+        setIsLoadingUsers(false);
+      },
+      (error) => {
+        console.warn('Admin user directory listener error:', error);
+        setIsLoadingUsers(false);
+      }
+    );
+
+    return () => unsubscribeAllUsers();
+  }, [isAdmin]);
+
+  // Admin user management actions
+  const refreshUsers = async () => {
+    if (!isAdmin) return;
+    setIsLoadingUsers(true);
+    try {
+      const snap = await getDocs(collection(db, 'users'));
+      const list: UserProfile[] = [];
+      snap.forEach((d) => {
+        const val = d.data();
+        list.push({
+          uid: d.id,
+          email: val.email || '',
+          displayName: val.displayName || 'Pengguna FinBag',
+          photoURL: val.photoURL,
+          role: val.role || 'user',
+          status: val.status || 'active',
+          createdAt: val.createdAt || new Date().toISOString(),
+          lastLoginAt: val.lastLoginAt || new Date().toISOString(),
+          baseCurrency: val.baseCurrency,
+          language: val.language,
+        });
+      });
+      list.sort((a, b) => (b.lastLoginAt || '').localeCompare(a.lastLoginAt || ''));
+      setAllUsers(list);
+    } catch (err) {
+      console.warn('Error refreshing users:', err);
+    } finally {
+      setIsLoadingUsers(false);
+    }
+  };
+
+  const toggleUserStatus = async (targetUid: string, currentStatus: 'active' | 'suspended') => {
+    if (!isAdmin) return;
+    const newStatus = currentStatus === 'active' ? 'suspended' : 'active';
+    const targetDoc = doc(db, 'users', targetUid);
+    try {
+      await setDoc(targetDoc, { status: newStatus }, { merge: true });
+    } catch (err) {
+      handleFirestoreError(err, OperationType.UPDATE, `users/${targetUid}`);
+    }
+  };
+
+  const deleteUserProfile = async (targetUid: string) => {
+    if (!isAdmin) return;
+    const targetDoc = doc(db, 'users', targetUid);
+    try {
+      await deleteDoc(targetDoc);
+    } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, `users/${targetUid}`);
+    }
+  };
 
   // Auth methods
   const loginWithGoogle = async () => {
@@ -333,6 +509,8 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
   const logout = async () => {
     await fbLogoutUser();
     setUser(null);
+    setCurrentUserProfile(null);
+    setAllUsers([]);
     setWallets([]);
     setTransactions([]);
     setGoals([]);
@@ -749,9 +927,18 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     <FinanceContext.Provider
       value={{
         user,
+        currentUserProfile,
+        allUsers,
+        isLoadingUsers,
+        refreshUsers,
+        toggleUserStatus,
+        deleteUserProfile,
+        isAdmin,
         isAuthLoading,
         loginWithGoogle,
         logout,
+        announcementNotice,
+        setAnnouncementNotice,
         language,
         setLanguage,
         baseCurrency,

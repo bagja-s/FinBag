@@ -2,16 +2,22 @@
   "entities": {
     "userProfile": {
       "title": "UserProfile",
-      "description": "User profile settings, currency, and language preferences",
+      "description": "User profile metadata, roles, status, and preferences",
       "type": "object",
       "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
         "displayName": { "type": "string", "maxLength": 100 },
         "email": { "type": "string", "maxLength": 200 },
+        "photoURL": { "type": "string", "maxLength": 500 },
+        "role": { "type": "string", "enum": ["creator", "admin", "user"] },
+        "status": { "type": "string", "enum": ["active", "suspended"] },
+        "createdAt": { "type": "string", "maxLength": 50 },
+        "lastLoginAt": { "type": "string", "maxLength": 50 },
         "baseCurrency": { "type": "string", "maxLength": 5 },
         "language": { "type": "string", "maxLength": 5 },
         "theme": { "type": "string", "maxLength": 10 }
       },
-      "required": ["baseCurrency", "language"]
+      "required": ["uid", "email"]
     },
     "wallet": {
       "title": "Wallet",
