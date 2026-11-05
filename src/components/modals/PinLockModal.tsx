@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useFinance } from '../../context/FinanceContext';
 import { getTranslation } from '../../i18n/translations';
 import { Lock, Delete } from 'lucide-react';
@@ -33,10 +34,12 @@ export const PinLockModal: React.FC = () => {
     setErrorMsg('');
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950 p-4">
-      <div className="w-full max-w-xs text-center space-y-6">
-        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-600/20 text-blue-500">
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/95 backdrop-blur-md p-4 animate-in fade-in duration-300 ease-out">
+      <div className="w-full max-w-xs text-center space-y-6 animate-in zoom-in-95 slide-in-from-bottom-4 duration-300 ease-out fill-mode-both">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-600/20 text-blue-500 shadow-lg shadow-blue-500/20">
           <Lock className="h-7 w-7" />
         </div>
 
@@ -90,6 +93,7 @@ export const PinLockModal: React.FC = () => {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

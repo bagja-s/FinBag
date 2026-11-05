@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useFinance } from '../../context/FinanceContext';
 import { getTranslation } from '../../i18n/translations';
 import { WalletType, SupportedCurrency } from '../../types/finance';
@@ -58,10 +59,19 @@ export const AddWalletModal: React.FC = () => {
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-200">
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-300 ease-out">
+      {/* Click outside backdrop */}
       <div 
-        className="w-full max-w-md rounded-t-3xl sm:rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-900"
+        className="fixed inset-0"
+        onClick={() => setIsAddWalletModalOpen(false)}
+        aria-hidden="true"
+      />
+
+      <div 
+        className="relative z-10 w-full max-w-md rounded-t-3xl sm:rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-900 animate-in slide-in-from-bottom-12 sm:slide-in-from-bottom-4 sm:zoom-in-95 duration-300 ease-out fill-mode-both"
         role="dialog"
       >
         <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
@@ -74,7 +84,7 @@ export const AddWalletModal: React.FC = () => {
           <button
             onClick={() => setIsAddWalletModalOpen(false)}
             aria-label="Tutup"
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800"
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 cursor-pointer transition-colors"
           >
             <X className="h-5 w-5" />
           </button>
@@ -97,7 +107,7 @@ export const AddWalletModal: React.FC = () => {
               onChange={(e) => setName(e.target.value)}
               placeholder="cth: Bank Mandiri, Dompet Tunai, GoPay"
               required
-              className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-medium text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-medium text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow"
             />
           </div>
 
@@ -109,7 +119,7 @@ export const AddWalletModal: React.FC = () => {
               <select
                 value={type}
                 onChange={(e) => setType(e.target.value as WalletType)}
-                className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-semibold text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white focus:outline-none"
+                className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-semibold text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white focus:outline-none cursor-pointer"
               >
                 <option value="bank">{t.bank}</option>
                 <option value="cash">{t.cash}</option>
@@ -125,7 +135,7 @@ export const AddWalletModal: React.FC = () => {
               <select
                 value={currency}
                 onChange={(e) => setCurrency(e.target.value as SupportedCurrency)}
-                className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-semibold text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white focus:outline-none"
+                className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-semibold text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white focus:outline-none cursor-pointer"
               >
                 <option value="IDR">IDR (Rp)</option>
                 <option value="USD">USD ($)</option>
@@ -149,7 +159,7 @@ export const AddWalletModal: React.FC = () => {
               value={balanceStr}
               onChange={(e) => setBalanceStr(e.target.value)}
               placeholder="0"
-              className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-mono font-bold text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 tabular-nums"
+              className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-mono font-bold text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 tabular-nums transition-shadow"
             />
           </div>
 
@@ -162,7 +172,7 @@ export const AddWalletModal: React.FC = () => {
               value={accountNumber}
               onChange={(e) => setAccountNumber(e.target.value)}
               placeholder="cth: •••• 8812 atau 0812345678"
-              className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-medium text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white focus:outline-none"
+              className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-medium text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white focus:outline-none transition-shadow"
             />
           </div>
 
@@ -176,7 +186,7 @@ export const AddWalletModal: React.FC = () => {
                   key={c}
                   type="button"
                   onClick={() => setColor(c)}
-                  className={`h-7 w-7 rounded-full transition-transform ${color === c ? 'ring-2 ring-offset-2 ring-blue-500 scale-110' : ''}`}
+                  className={`h-7 w-7 rounded-full transition-transform active:scale-95 cursor-pointer ${color === c ? 'ring-2 ring-offset-2 ring-blue-500 scale-110' : 'hover:scale-105'}`}
                   style={{ backgroundColor: c }}
                 />
               ))}
@@ -186,13 +196,14 @@ export const AddWalletModal: React.FC = () => {
           <div className="pt-2">
             <button
               type="submit"
-              className="flex w-full items-center justify-center rounded-xl bg-blue-600 py-3 text-xs font-bold text-white shadow-md shadow-blue-600/20 hover:bg-blue-500 active:scale-[0.99] transition-all"
+              className="flex w-full items-center justify-center rounded-xl bg-blue-600 py-3 text-xs font-bold text-white shadow-md shadow-blue-600/20 hover:bg-blue-500 active:scale-[0.98] transition-all cursor-pointer"
             >
               {t.save}
             </button>
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

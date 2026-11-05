@@ -69,12 +69,14 @@ const MainLayout: React.FC = () => {
 
         {/* Viewport Canvas */}
         <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-full overflow-x-hidden min-h-[calc(100vh-3.5rem)]">
-          {activeTab === 'dashboard' && <DashboardView />}
-          {activeTab === 'wallets' && <WalletsView />}
-          {activeTab === 'rates' && <ExchangeRatesView />}
-          {activeTab === 'budgets' && <BudgetsView />}
-          {activeTab === 'transactions' && <TransactionsView />}
-          {activeTab === 'tools' && <ToolsView />}
+          <div key={activeTab} className="animate-in fade-in-0 slide-in-from-bottom-3 duration-300 fill-mode-both ease-out">
+            {activeTab === 'dashboard' && <DashboardView />}
+            {activeTab === 'wallets' && <WalletsView />}
+            {activeTab === 'rates' && <ExchangeRatesView />}
+            {activeTab === 'budgets' && <BudgetsView />}
+            {activeTab === 'transactions' && <TransactionsView />}
+            {activeTab === 'tools' && <ToolsView />}
+          </div>
         </main>
       </div>
 

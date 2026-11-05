@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useFinance } from '../../context/FinanceContext';
 import { getTranslation } from '../../i18n/translations';
 import { TransactionType, SupportedCurrency } from '../../types/finance';
@@ -15,7 +16,10 @@ import {
   Tag, 
   Wallet,
   Sparkles,
-  Edit3
+  Edit3,
+  Camera,
+  Loader2,
+  CheckCircle2
 } from 'lucide-react';
 
 export const TransactionModal: React.FC = () => {
@@ -55,6 +59,11 @@ export const TransactionModal: React.FC = () => {
   const [showConfirmModal, setShowConfirmModal] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
+  // AI Receipt Scanner state
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isScanningReceipt, setIsScanningReceipt] = useState<boolean>(false);
+  const [scanSuccessMessage, setScanSuccessMessage] = useState<string | null>(null);
+
   // Sync state whenever modal opens or editingTransaction changes
   useEffect(() => {
     if (!isTransactionModalOpen) return;
@@ -72,6 +81,7 @@ export const TransactionModal: React.FC = () => {
       setAutoDetectedCategory(null);
       setUserManuallySelectedCategory(true);
       setErrorMsg('');
+      setScanSuccessMessage(null);
     } else {
       setType('expense');
       setAmountStr('');
@@ -85,6 +95,7 @@ export const TransactionModal: React.FC = () => {
       setAutoDetectedCategory(null);
       setUserManuallySelectedCategory(false);
       setErrorMsg('');
+      setScanSuccessMessage(null);
     }
   }, [isTransactionModalOpen, editingTransaction, baseCurrency, wallets, categories]);
 
@@ -99,6 +110,86 @@ export const TransactionModal: React.FC = () => {
     setEditingTransaction(null);
     setShowConfirmModal(false);
     setErrorMsg('');
+    setScanSuccessMessage(null);
+    setIsScanningReceipt(false);
+  };
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Reset value so user can pick the same file again if needed
+    e.target.value = '';
+
+    setIsScanningReceipt(true);
+    setErrorMsg('');
+    setScanSuccessMessage(null);
+
+    try {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        try {
+          const base64Data = reader.result as string;
+          const res = await fetch('/api/scan-receipt', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              imageBase64: base64Data,
+              mimeType: file.type || 'image/jpeg',
+            }),
+          });
+
+          const data = await res.json();
+          if (!res.ok || !data.success) {
+            throw new Error(data.error || t.scanError);
+          }
+
+          const receipt = data.data;
+          if (receipt.totalAmount) {
+            setAmountStr(receipt.totalAmount.toString());
+          }
+          if (receipt.merchant) {
+            setDescription(receipt.merchant);
+          }
+          if (receipt.date) {
+            setDate(receipt.date);
+          }
+          if (receipt.category) {
+            const matchedCategory = categories.find((c) => c.id === receipt.category);
+            if (matchedCategory) {
+              setCategoryId(receipt.category);
+              setAutoDetectedCategory(receipt.category);
+              setUserManuallySelectedCategory(false);
+            }
+          }
+          if (receipt.currency && (['IDR', 'USD', 'EUR', 'SGD', 'MYR', 'JPY', 'GBP', 'AUD'] as SupportedCurrency[]).includes(receipt.currency)) {
+            setCurrency(receipt.currency);
+          }
+          if (receipt.notes) {
+            setNotes(receipt.notes);
+          }
+          setType('expense');
+
+          setScanSuccessMessage(
+            `${t.scanSuccess} ${receipt.merchant ? `(${receipt.merchant})` : ''} — Total: ${formatCurrency(receipt.totalAmount, receipt.currency || currency)}`
+          );
+        } catch (scanErr) {
+          console.error(scanErr);
+          setErrorMsg(t.scanError);
+        } finally {
+          setIsScanningReceipt(false);
+        }
+      };
+      reader.onerror = () => {
+        setErrorMsg('Gagal membaca file gambar.');
+        setIsScanningReceipt(false);
+      };
+      reader.readAsDataURL(file);
+    } catch (err) {
+      console.error(err);
+      setErrorMsg('Gagal memproses struk.');
+      setIsScanningReceipt(false);
+    }
   };
 
   const handleDescriptionChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -194,16 +285,26 @@ export const TransactionModal: React.FC = () => {
   const sourceWalletObj = wallets.find((w) => w.id === sourceWalletId);
   const targetWalletObj = wallets.find((w) => w.id === targetWalletId);
 
+  if (typeof document === 'undefined') return null;
+
   return (
     <>
-      <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-200">
-        <div 
-          className="w-full max-w-lg rounded-t-3xl sm:rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-900 max-h-[92vh] overflow-y-auto"
-          role="dialog"
-          aria-modal="true"
-        >
-          {/* Mobile Drag Indicator */}
-          <div className="w-10 h-1 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto mb-3 sm:hidden" />
+      {createPortal(
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-300 ease-out">
+          {/* Backdrop click dismiss */}
+          <div 
+            className="fixed inset-0"
+            onClick={handleClose}
+            aria-hidden="true"
+          />
+
+          <div 
+            className="relative z-10 w-full max-w-lg rounded-t-3xl sm:rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-900 max-h-[92vh] overflow-y-auto animate-in slide-in-from-bottom-12 sm:slide-in-from-bottom-4 sm:zoom-in-95 duration-300 ease-out fill-mode-both"
+            role="dialog"
+            aria-modal="true"
+          >
+            {/* Mobile Drag Indicator */}
+            <div className="w-10 h-1 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto mb-3 sm:hidden" />
 
           <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
             <div className="flex items-center gap-2">
@@ -228,6 +329,55 @@ export const TransactionModal: React.FC = () => {
           {errorMsg && (
             <div className="mt-3 rounded-lg bg-rose-50 p-2.5 text-xs font-semibold text-rose-600 dark:bg-rose-950/40 dark:text-rose-300">
               {errorMsg}
+            </div>
+          )}
+
+          {/* AI Receipt Camera Scanner Trigger (Add mode only) */}
+          {!isEditMode && (
+            <div className="mt-3">
+              <input
+                type="file"
+                ref={fileInputRef}
+                accept="image/*"
+                capture="environment"
+                onChange={handleFileSelect}
+                className="hidden"
+              />
+              <button
+                type="button"
+                disabled={isScanningReceipt}
+                onClick={() => fileInputRef.current?.click()}
+                className="group flex w-full items-center justify-between rounded-2xl border border-blue-200 bg-gradient-to-r from-blue-50/90 to-indigo-50/90 p-3 text-xs font-semibold text-blue-700 hover:from-blue-100 hover:to-indigo-100 dark:border-blue-900/50 dark:from-blue-950/40 dark:to-indigo-950/40 dark:text-blue-300 transition-all shadow-xs cursor-pointer disabled:opacity-70 disabled:pointer-events-none"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600 text-white shadow-sm shadow-blue-500/20 group-hover:scale-105 transition-transform">
+                    {isScanningReceipt ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Camera className="h-4 w-4" />
+                    )}
+                  </div>
+                  <div className="text-left">
+                    <span className="block font-bold leading-tight">
+                      {isScanningReceipt ? t.scanningReceipt : t.scanReceipt}
+                    </span>
+                    <span className="text-[10px] text-blue-600/80 dark:text-blue-400 font-normal">
+                      Foto bon/struk via kamera HP untuk auto-input nominal & kategori
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1 rounded-lg bg-blue-600/10 dark:bg-blue-400/10 px-2 py-1 text-[10px] font-bold text-blue-600 dark:text-blue-400">
+                  <Sparkles className="h-3 w-3" />
+                  <span>Gemini AI</span>
+                </div>
+              </button>
+
+              {scanSuccessMessage && (
+                <div className="mt-2 flex items-center gap-2 rounded-xl bg-emerald-50 p-2.5 text-xs text-emerald-700 border border-emerald-200/60 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800/60 animate-in fade-in duration-200">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
+                  <span className="font-medium text-[11px]">{scanSuccessMessage}</span>
+                </div>
+              )}
             </div>
           )}
 
@@ -487,7 +637,9 @@ export const TransactionModal: React.FC = () => {
             </div>
           </form>
         </div>
-      </div>
+      </div>,
+      document.body
+    )}
 
       {/* Confirmation Modal before applying changes */}
       <ConfirmationModal

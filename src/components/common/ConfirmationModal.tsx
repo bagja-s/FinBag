@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { AlertTriangle, Trash2, CheckCircle2, X } from 'lucide-react';
 
 export interface ConfirmationModalProps {
@@ -65,21 +66,30 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
 
   const { iconBg, Icon, confirmBtn } = getVariantStyles();
 
-  return (
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
     <div 
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-300 ease-out"
       role="dialog"
       aria-modal="true"
       aria-labelledby="confirm-modal-title"
     >
+      {/* Click outside backdrop to cancel */}
       <div 
-        className="w-full max-w-md rounded-t-3xl sm:rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-900 animate-in slide-in-from-bottom-6 sm:slide-in-from-bottom-2 duration-200"
+        className="fixed inset-0" 
+        onClick={() => { if (!isLoading) onCancel(); }}
+        aria-hidden="true" 
+      />
+
+      <div 
+        className="relative z-10 w-full max-w-md rounded-t-3xl sm:rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-900 animate-in slide-in-from-bottom-12 sm:slide-in-from-bottom-4 sm:zoom-in-95 duration-300 ease-out fill-mode-both"
       >
         {/* Mobile Drag Indicator */}
         <div className="w-10 h-1 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto mb-3 sm:hidden" />
 
         <div className="flex items-start gap-3.5">
-          <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${iconBg} shadow-sm`}>
+          <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${iconBg} shadow-sm transition-transform duration-200 scale-100`}>
             <Icon className="h-5 w-5" />
           </div>
 
@@ -92,7 +102,7 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
                 onClick={onCancel}
                 disabled={isLoading}
                 aria-label="Tutup"
-                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-lg transition-colors"
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-lg transition-colors cursor-pointer"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -121,7 +131,7 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
             type="button"
             onClick={onCancel}
             disabled={isLoading}
-            className="flex-1 sm:flex-none rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 transition-colors cursor-pointer"
+            className="flex-1 sm:flex-none rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 active:scale-95 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 transition-all cursor-pointer"
           >
             {cancelText}
           </button>
@@ -138,6 +148,7 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

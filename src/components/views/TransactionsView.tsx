@@ -181,10 +181,10 @@ export const TransactionsView: React.FC = () => {
               return (
                 <div
                   key={tx.id}
-                  className="group flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors"
+                  className="group flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 hover:bg-slate-50/90 dark:hover:bg-slate-800/50 hover:-translate-y-0.5 transition-all duration-200"
                 >
                   <div className="flex items-start gap-3 min-w-0">
-                    <div className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white shadow-sm ${
+                    <div className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white shadow-sm transition-transform duration-200 group-hover:scale-105 ${
                       tx.type === 'income'
                         ? 'bg-emerald-500'
                         : tx.type === 'expense'
@@ -249,7 +249,7 @@ export const TransactionsView: React.FC = () => {
                         onClick={() => openEditTransaction(tx)}
                         title="Edit Transaksi"
                         aria-label={`Edit ${tx.description}`}
-                        className="flex items-center gap-1 p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 dark:text-slate-400 dark:hover:text-blue-400 dark:hover:bg-blue-950/40 rounded-lg transition-all cursor-pointer"
+                        className="flex items-center gap-1 p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 dark:text-slate-400 dark:hover:text-blue-400 dark:hover:bg-blue-950/40 rounded-lg transition-all duration-150 active:scale-90 cursor-pointer"
                       >
                         <Edit3 className="h-4 w-4" />
                         <span className="text-[11px] font-medium sm:hidden">{t.edit}</span>
@@ -259,7 +259,7 @@ export const TransactionsView: React.FC = () => {
                         onClick={() => setTxToDelete(tx)}
                         title="Hapus Transaksi"
                         aria-label={`Hapus ${tx.description}`}
-                        className="flex items-center gap-1 p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:text-slate-400 dark:hover:text-rose-400 dark:hover:bg-rose-950/40 rounded-lg transition-all cursor-pointer"
+                        className="flex items-center gap-1 p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:text-slate-400 dark:hover:text-rose-400 dark:hover:bg-rose-950/40 rounded-lg transition-all duration-150 active:scale-90 cursor-pointer"
                       >
                         <Trash2 className="h-4 w-4" />
                         <span className="text-[11px] font-medium sm:hidden">{t.delete}</span>

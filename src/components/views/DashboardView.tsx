@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { ConfirmationModal } from '../common/ConfirmationModal';
 import { Transaction } from '../../types/finance';
+import { MonthlyBudgetReport } from '../dashboard/MonthlyBudgetReport';
 
 export const DashboardView: React.FC = () => {
   const { 
@@ -140,7 +141,7 @@ export const DashboardView: React.FC = () => {
               <div
                 key={wallet.id}
                 onClick={() => setActiveTab('wallets')}
-                className="min-w-[200px] sm:min-w-[230px] rounded-2xl border border-slate-200 bg-white p-4 shadow-sm hover:shadow-md dark:border-slate-800 dark:bg-slate-900 transition-all cursor-pointer snap-start"
+                className="min-w-[200px] sm:min-w-[230px] rounded-2xl border border-slate-200 bg-white p-4 shadow-sm hover:shadow-md hover:-translate-y-1 active:scale-[0.98] dark:border-slate-800 dark:bg-slate-900 transition-all duration-200 ease-out cursor-pointer snap-start"
               >
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs font-bold text-slate-900 dark:text-white truncate">
@@ -162,7 +163,10 @@ export const DashboardView: React.FC = () => {
         )}
       </div>
 
-      {/* 3. Budget Status & Category Spending Grid */}
+      {/* 3. Monthly Financial Summary Report (Recharts Spending vs Budget) */}
+      <MonthlyBudgetReport />
+
+      {/* 4. Budget Status & Category Spending Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Spending Allocation */}
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
@@ -287,9 +291,9 @@ export const DashboardView: React.FC = () => {
               const targetWallet = wallets.find((w) => w.id === tx.targetWalletId);
 
               return (
-                <div key={tx.id} className="group flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 py-3 hover:bg-slate-50/60 dark:hover:bg-slate-800/30 rounded-xl px-2 transition-colors">
+                <div key={tx.id} className="group flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 py-3 hover:bg-slate-50/80 dark:hover:bg-slate-800/40 rounded-xl px-2.5 transition-all duration-200 hover:-translate-y-0.5">
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className={`flex h-9 w-9 items-center justify-center rounded-xl shrink-0 ${
+                    <div className={`flex h-9 w-9 items-center justify-center rounded-xl shrink-0 transition-transform duration-200 group-hover:scale-105 ${
                       tx.type === 'income'
                         ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400'
                         : tx.type === 'expense'
@@ -347,7 +351,7 @@ export const DashboardView: React.FC = () => {
                         onClick={() => openEditTransaction(tx)}
                         title="Edit Transaksi"
                         aria-label={`Edit ${tx.description}`}
-                        className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 rounded-lg transition-colors cursor-pointer"
+                        className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 rounded-lg transition-all duration-150 active:scale-90 cursor-pointer"
                       >
                         <Edit3 className="h-3.5 w-3.5" />
                       </button>
@@ -355,7 +359,7 @@ export const DashboardView: React.FC = () => {
                         onClick={() => setTxToDelete(tx)}
                         title="Hapus Transaksi"
                         aria-label={`Hapus ${tx.description}`}
-                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-colors cursor-pointer"
+                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-all duration-150 active:scale-90 cursor-pointer"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>

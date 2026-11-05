@@ -1,6 +1,6 @@
 {
-  "summary": "Rencana perbaikan dan penyederhanaan top navbar pada tampilan mobile: memindahkan kontrol sekunder (mata uang, bahasa, tema, dan kunci) ke dalam Menu Preferensi Mobile / Bottom Sheet yang rapi, mempertahankan tampilan desktop lengkap, dan menjadikan header mobile bersih dan lega.",
-  "updatedAt": "2026-11-04T02:08:41.143716366Z",
+  "summary": "Laporan ringkasan keuangan bulanan (Monthly Financial Summary Report) berbasis Recharts telah berhasil diimplementasikan pada dasbor FinBag, lengkap dengan pemilih bulan interaktif, diagram batang berkelompok per kategori, KPI finansial, dan peringatan overbudget.",
+  "updatedAt": "2026-11-05T02:18:58.590146533Z",
   "requestFeedback": true,
   "userFacing": true
 }
