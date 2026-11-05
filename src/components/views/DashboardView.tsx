@@ -22,6 +22,7 @@ import {
 import { ConfirmationModal } from '../common/ConfirmationModal';
 import { Transaction } from '../../types/finance';
 import { MonthlyBudgetReport } from '../dashboard/MonthlyBudgetReport';
+import { PWAInstallBanner } from '../common/PWAInstallBanner';
 
 export const DashboardView: React.FC = () => {
   const { 
@@ -58,6 +59,9 @@ export const DashboardView: React.FC = () => {
 
   return (
     <div className="space-y-6 pb-20 lg:pb-8">
+      {/* Smart PWA Install Suggestion Banner */}
+      <PWAInstallBanner />
+
       {/* 1. Executive Net Worth Card */}
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 p-6 text-white shadow-xl border border-blue-900/40">
         <div className="flex items-center justify-between">

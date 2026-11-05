@@ -1,20 +1,24 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useFinance } from '../../context/FinanceContext';
 import { getTranslation } from '../../i18n/translations';
 import { WalletType, SupportedCurrency } from '../../types/finance';
-import { X, Wallet } from 'lucide-react';
+import { X, Wallet, Edit3 } from 'lucide-react';
 
 export const AddWalletModal: React.FC = () => {
   const { 
     isAddWalletModalOpen, 
     setIsAddWalletModalOpen, 
+    editingWallet,
+    setEditingWallet,
     addWallet, 
+    updateWallet,
     baseCurrency, 
     language 
   } = useFinance();
 
   const t = getTranslation(language);
+  const isEditing = !!editingWallet;
 
   const [name, setName] = useState('');
   const [type, setType] = useState<WalletType>('bank');
@@ -24,6 +28,26 @@ export const AddWalletModal: React.FC = () => {
   const [accountNumber, setAccountNumber] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
+  // Sync state whenever editingWallet or modal open state changes
+  useEffect(() => {
+    if (editingWallet) {
+      setName(editingWallet.name);
+      setType(editingWallet.type);
+      setBalanceStr(String(editingWallet.balance));
+      setCurrency(editingWallet.currency);
+      setColor(editingWallet.color || '#2563EB');
+      setAccountNumber(editingWallet.accountNumber || '');
+    } else {
+      setName('');
+      setType('bank');
+      setBalanceStr('');
+      setCurrency(baseCurrency);
+      setColor('#2563EB');
+      setAccountNumber('');
+    }
+    setErrorMsg('');
+  }, [editingWallet, isAddWalletModalOpen, baseCurrency]);
+
   if (!isAddWalletModalOpen) return null;
 
   const colorPalette = [
@@ -31,31 +55,47 @@ export const AddWalletModal: React.FC = () => {
     '#DC2626', '#0284C7', '#4F46E5', '#0D9488'
   ];
 
+  const handleClose = () => {
+    setIsAddWalletModalOpen(false);
+    setEditingWallet(null);
+    setErrorMsg('');
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
-      setErrorMsg('Nama dompet wajib diisi.');
+      setErrorMsg(language === 'id' ? 'Nama dompet wajib diisi.' : 'Wallet name is required.');
       return;
     }
-    const initialBalance = parseFloat(balanceStr) || 0;
+    const balance = parseFloat(balanceStr) || 0;
 
     try {
-      await addWallet({
-        name: name.trim(),
-        type,
-        balance: initialBalance,
-        currency,
-        color,
-        accountNumber: accountNumber.trim() || undefined,
-      });
+      if (isEditing && editingWallet) {
+        await updateWallet(editingWallet.id, {
+          name: name.trim(),
+          type,
+          balance,
+          currency,
+          color,
+          accountNumber: accountNumber.trim() || undefined,
+        });
+      } else {
+        await addWallet({
+          name: name.trim(),
+          type,
+          balance,
+          currency,
+          color,
+          accountNumber: accountNumber.trim() || undefined,
+        });
+      }
 
-      setName('');
-      setBalanceStr('');
-      setAccountNumber('');
-      setErrorMsg('');
-      setIsAddWalletModalOpen(false);
+      handleClose();
     } catch (err) {
-      setErrorMsg('Gagal menambahkan dompet.');
+      setErrorMsg(isEditing 
+        ? (language === 'id' ? 'Gagal memperbarui dompet.' : 'Failed to update wallet.')
+        : (language === 'id' ? 'Gagal menambahkan dompet.' : 'Failed to add wallet.')
+      );
     }
   };
 
@@ -66,7 +106,7 @@ export const AddWalletModal: React.FC = () => {
       {/* Click outside backdrop */}
       <div 
         className="fixed inset-0"
-        onClick={() => setIsAddWalletModalOpen(false)}
+        onClick={handleClose}
         aria-hidden="true"
       />
 
@@ -76,13 +116,17 @@ export const AddWalletModal: React.FC = () => {
       >
         <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
           <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-100 text-blue-600 dark:bg-blue-950 dark:text-blue-400">
-              <Wallet className="h-4 w-4" />
+            <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${
+              isEditing ? 'bg-amber-100 text-amber-600 dark:bg-amber-950 dark:text-amber-400' : 'bg-blue-100 text-blue-600 dark:bg-blue-950 dark:text-blue-400'
+            }`}>
+              {isEditing ? <Edit3 className="h-4 w-4" /> : <Wallet className="h-4 w-4" />}
             </div>
-            <h2 className="text-base font-bold text-slate-900 dark:text-white">{t.addWallet}</h2>
+            <h2 className="text-base font-bold text-slate-900 dark:text-white">
+              {isEditing ? t.editWallet : t.addWallet}
+            </h2>
           </div>
           <button
-            onClick={() => setIsAddWalletModalOpen(false)}
+            onClick={handleClose}
             aria-label="Tutup"
             className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 cursor-pointer transition-colors"
           >
@@ -151,7 +195,7 @@ export const AddWalletModal: React.FC = () => {
 
           <div>
             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-              {t.initialBalance}
+              {isEditing ? (language === 'id' ? 'Saldo Dompet' : 'Wallet Balance') : t.initialBalance}
             </label>
             <input
               type="number"
@@ -198,7 +242,7 @@ export const AddWalletModal: React.FC = () => {
               type="submit"
               className="flex w-full items-center justify-center rounded-xl bg-blue-600 py-3 text-xs font-bold text-white shadow-md shadow-blue-600/20 hover:bg-blue-500 active:scale-[0.98] transition-all cursor-pointer"
             >
-              {t.save}
+              {isEditing ? t.save : t.addWallet}
             </button>
           </div>
         </form>

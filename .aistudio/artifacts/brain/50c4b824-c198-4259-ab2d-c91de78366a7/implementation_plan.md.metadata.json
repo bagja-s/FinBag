@@ -1,6 +1,6 @@
 {
-  "summary": "Setup konfigurasi deployment Vercel (vercel.json, api/scan-receipt.ts serverless function, dan VERCEL_DEPLOYMENT_GUIDE.md) telah selesai disiapkan dan diverifikasi dengan sukses.",
-  "updatedAt": "2026-11-05T02:30:05.329344929Z",
+  "summary": "Fitur Edit/Hapus Dompet dengan sinkronisasi Firestore, Tutorial Onboarding 4-langkah saat login pertama, Banner rekomendasi instalasi PWA, dan Ikon Aplikasi PWA resolusi tinggi telah selesai dibangun dan diverifikasi.",
+  "updatedAt": "2026-11-05T02:49:12.082730036Z",
   "requestFeedback": true,
   "userFacing": true
 }

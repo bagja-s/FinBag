@@ -69,9 +69,18 @@ interface FinanceContextType {
   setIsTransactionModalOpen: (open: boolean) => void;
   isAddWalletModalOpen: boolean;
   setIsAddWalletModalOpen: (open: boolean) => void;
+  editingWallet: WalletAccount | null;
+  setEditingWallet: (w: WalletAccount | null) => void;
+  openEditWallet: (w: WalletAccount) => void;
+  openAddWallet: () => void;
   editingTransaction: Transaction | null;
   setEditingTransaction: (tx: Transaction | null) => void;
   openEditTransaction: (tx: Transaction) => void;
+
+  // Onboarding Tutorial
+  isOnboardingOpen: boolean;
+  setIsOnboardingOpen: (open: boolean) => void;
+  openTutorial: () => void;
 
   // Data
   wallets: WalletAccount[];
@@ -87,6 +96,8 @@ interface FinanceContextType {
   updateTransaction: (id: string, updatedTx: Omit<Transaction, 'id' | 'userId' | 'createdAt'>) => Promise<void>;
   deleteTransaction: (id: string) => Promise<void>;
   addWallet: (wallet: Omit<WalletAccount, 'id'>) => Promise<void>;
+  updateWallet: (id: string, updated: Omit<WalletAccount, 'id' | 'userId'>) => Promise<void>;
+  deleteWallet: (id: string) => Promise<void>;
   transferFunds: (sourceId: string, targetId: string, amount: number, currency: SupportedCurrency) => Promise<void>;
   updateBudgetLimit: (categoryId: string, limit: number) => Promise<void>;
   addGoal: (goal: Omit<SavingsGoal, 'id' | 'currentAmount'>) => Promise<void>;
@@ -130,10 +141,26 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
   const [isAddWalletModalOpen, setIsAddWalletModalOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+  const [editingWallet, setEditingWallet] = useState<WalletAccount | null>(null);
+  const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
 
   const openEditTransaction = (tx: Transaction) => {
     setEditingTransaction(tx);
     setIsTransactionModalOpen(true);
+  };
+
+  const openEditWallet = (wallet: WalletAccount) => {
+    setEditingWallet(wallet);
+    setIsAddWalletModalOpen(true);
+  };
+
+  const openAddWallet = () => {
+    setEditingWallet(null);
+    setIsAddWalletModalOpen(true);
+  };
+
+  const openTutorial = () => {
+    setIsOnboardingOpen(true);
   };
 
   // Financial Data - strictly empty initial state directly loaded from user database
@@ -239,6 +266,12 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
   // Firestore Sync when user is authenticated - 100% direct database, NO dummy seeding
   useEffect(() => {
     if (!user) return;
+
+    // Trigger onboarding tutorial on first user login
+    const hasSeenTutorial = localStorage.getItem(`${LOCAL_STORAGE_PREFIX}onboarding_completed`);
+    if (!hasSeenTutorial) {
+      setIsOnboardingOpen(true);
+    }
 
     const userId = user.uid;
 
@@ -482,6 +515,44 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     }
   };
 
+  const updateWallet = async (
+    id: string,
+    updatedData: Omit<WalletAccount, 'id' | 'userId'>
+  ) => {
+    const existing = wallets.find((w) => w.id === id);
+    if (!existing) return;
+
+    const updatedWallet: WalletAccount = {
+      ...updatedData,
+      id,
+      userId: user?.uid,
+    };
+
+    setWallets((prev) => prev.map((w) => (w.id === id ? updatedWallet : w)));
+
+    if (user) {
+      const path = `users/${user.uid}/wallets`;
+      try {
+        await setDoc(doc(db, path, id), cleanFirestoreData(updatedWallet), { merge: true });
+      } catch (err) {
+        handleFirestoreError(err, OperationType.WRITE, path);
+      }
+    }
+  };
+
+  const deleteWallet = async (id: string) => {
+    setWallets((prev) => prev.filter((w) => w.id !== id));
+
+    if (user) {
+      const path = `users/${user.uid}/wallets`;
+      try {
+        await deleteDoc(doc(db, path, id));
+      } catch (err) {
+        handleFirestoreError(err, OperationType.DELETE, path);
+      }
+    }
+  };
+
   const transferFunds = async (
     sourceId: string, 
     targetId: string, 
@@ -698,9 +769,16 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
         setIsTransactionModalOpen,
         isAddWalletModalOpen,
         setIsAddWalletModalOpen,
+        editingWallet,
+        setEditingWallet,
+        openEditWallet,
+        openAddWallet,
         editingTransaction,
         setEditingTransaction,
         openEditTransaction,
+        isOnboardingOpen,
+        setIsOnboardingOpen,
+        openTutorial,
         wallets,
         transactions,
         categories,
@@ -712,6 +790,8 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
         updateTransaction,
         deleteTransaction,
         addWallet,
+        updateWallet,
+        deleteWallet,
         transferFunds,
         updateBudgetLimit,
         addGoal,

@@ -18,6 +18,7 @@ import { LoginView } from './components/views/LoginView';
 import { TransactionModal } from './components/modals/TransactionModal';
 import { AddWalletModal } from './components/modals/AddWalletModal';
 import { PinLockModal } from './components/modals/PinLockModal';
+import { OnboardingTutorialModal } from './components/onboarding/OnboardingTutorialModal';
 import { useOnlineStatus } from './hooks/useOnlineStatus';
 import { WifiOff, Loader2 } from 'lucide-react';
 
@@ -86,6 +87,7 @@ const MainLayout: React.FC = () => {
       {/* Interactive Global Modals */}
       <TransactionModal />
       <AddWalletModal />
+      <OnboardingTutorialModal />
     </div>
   );
 };

@@ -162,6 +162,33 @@ export const translations = {
     nextMonth: 'Bulan Berikutnya',
     noBudgetsConfigured: 'Belum ada pagu anggaran kategori yang ditentukan.',
     configureBudgets: 'Atur Anggaran',
+
+    // Wallet Edit & Delete
+    editWallet: 'Ubah Dompet',
+    deleteWallet: 'Hapus Dompet',
+    confirmDeleteWalletTitle: 'Hapus Akun Dompet?',
+    confirmDeleteWalletDesc: 'Tindakan ini akan menghapus akun dompet ini secara permanen. Catatan transaksi yang sudah ada tetap diarsipkan.',
+    updateWalletSuccess: 'Data dompet berhasil diperbarui',
+    deleteWalletSuccess: 'Dompet berhasil dihapus',
+
+    // Onboarding Tutorial & Install Prompt
+    onboardingTitle: 'Selamat Datang di FinBag',
+    onboardingSubtitle: 'Panduan singkat untuk memulai pengalaman pencatatan keuangan Anda',
+    step1Title: 'Multi-Mata Uang & Sinkronisasi Cloud',
+    step1Desc: 'Kelola kas tunai, rekening bank, dan e-wallet dalam berbagai mata uang dunia dengan konversi kurs live otomatis.',
+    step2Title: 'Catat Cepat & Scan Struk Berbasis AI',
+    step2Desc: 'Gunakan kamera smartphone Anda untuk memindai bon dan struk belanja. Gemini 3.8 Flash akan otomatis mendeteksi total, toko, dan kategori.',
+    step3Title: 'Pantau Pagu Anggaran & Laporan Recharts',
+    step3Desc: 'Visualisasikan perbandingan pengeluaran riil vs batas anggaran secara interaktif dengan diagram batang berkala bulanan.',
+    step4Title: 'Pasang FinBag di Layar Utama HP / Desktop',
+    step4Desc: 'Jadikan FinBag sebagai aplikasi mandiri di perangkat Anda (PWA) agar dapat dibuka cepat tanpa membuka browser terlebih dahulu.',
+    installNow: 'Pasang Aplikasi Sekarang',
+    startUsingApp: 'Mulai Gunakan FinBag',
+    nextStep: 'Lanjut',
+    prevStep: 'Kembali',
+    repeatTutorial: 'Tutorial Penggunaan',
+    installBannerTitle: 'Pasang FinBag di Perangkat Anda',
+    installBannerDesc: 'Akses cepat dari layar utama Anda, bebas unduhan store, dan dapat bekerja secara offline.',
   },
   en: {
     appTitle: 'FinBag',
@@ -324,6 +351,33 @@ export const translations = {
     nextMonth: 'Next Month',
     noBudgetsConfigured: 'No category budget limits configured yet.',
     configureBudgets: 'Configure Budgets',
+
+    // Wallet Edit & Delete
+    editWallet: 'Edit Wallet',
+    deleteWallet: 'Delete Wallet',
+    confirmDeleteWalletTitle: 'Delete Wallet Account?',
+    confirmDeleteWalletDesc: 'This action will permanently delete this wallet account. Existing historical transactions will remain archived.',
+    updateWalletSuccess: 'Wallet details successfully updated',
+    deleteWalletSuccess: 'Wallet successfully deleted',
+
+    // Onboarding Tutorial & Install Prompt
+    onboardingTitle: 'Welcome to FinBag',
+    onboardingSubtitle: 'A quick tour to get started with your personal wealth tracking',
+    step1Title: 'Multi-Currency & Cloud Sync',
+    step1Desc: 'Manage cash, bank accounts, and e-wallets across global currencies with live FX rate conversion.',
+    step2Title: 'Fast Record & AI Receipt Scan',
+    step2Desc: 'Use your smartphone camera to scan shopping receipts. Gemini 3.8 Flash automatically detects the total, merchant, and category.',
+    step3Title: 'Track Budgets & Monthly Trends',
+    step3Desc: 'Visualize actual spending trends vs budget limits per category with interactive monthly Recharts graphs.',
+    step4Title: 'Install FinBag on Home Screen',
+    step4Desc: 'Install FinBag as a Progressive Web App (PWA) on your phone or desktop for instant native-like access.',
+    installNow: 'Install App Now',
+    startUsingApp: 'Start Using FinBag',
+    nextStep: 'Next',
+    prevStep: 'Back',
+    repeatTutorial: 'App Tutorial',
+    installBannerTitle: 'Install FinBag on Your Device',
+    installBannerDesc: 'Access directly from your home screen with zero app store delays, plus full offline caching.',
   },
 };
 
