@@ -1,25 +1,18 @@
-# FinBag - Laporan Ringkasan Keuangan Bulanan dengan Recharts (Spending vs Budget)
+# FinBag - Panduan & Konfigurasi Setup Deployment ke Vercel
 
-Laporan ringkasan keuangan bulanan pada Dasbor FinBag dengan visualisasi perbandingan tren pengeluaran aktual vs pagu anggaran per kategori berbasis Recharts telah selesai diimplementasikan.
+Setup konfigurasi deployment dan dokumentasi panduan lengkap untuk deploy aplikasi FinBag ke platform Vercel telah selesai diimplementasikan.
 
 ---
 
 ### Status Implementasi: SELESAI (COMPLETED)
 
-- [x] **Modul 1: Instalasi Paket Recharts**: `recharts` berhasil dipasang dan dikonfigurasi.
-- [x] **Modul 2: Penambahan Kunci Terjemahan (i18n)**: Kunci terjemahan dwibahasa (Indonesia & Inggris) untuk semua label, status variansi, peringatan overbudget, dan navigasi bulan telah ditambahkan ke `src/i18n/translations.ts`.
-- [x] **Modul 3: Pembuatan Komponen `MonthlyBudgetReport.tsx`**:
-  - `ResponsiveContainer`, `BarChart`, `Bar`, `XAxis`, `YAxis`, `CartesianGrid`, `Tooltip`, dan `Legend` dari `recharts`.
-  - Pemilih bulan (*Month Selector*) interaktif dengan tombol prev/next dan dropdown 12 bulan terakhir.
-  - Kartu KPI ringkasan: Total Pengeluaran, Total Pagu Anggaran, dan Sisa/Defisit Anggaran dengan badge status.
-  - Diagram batang berkelompok (Pengeluaran Aktual vs Pagu Anggaran per kategori).
-  - Pewarnaan adaptif cerdas (merah bila melebihi pagu, biru/emerald bila dalam batas aman).
-  - *Custom Tooltip* dengan nominal terformat, persentase realisasi, dan selisih selisih anggaran.
-  - Strip notifikasi peringatan overbudget jika ada kategori yang melampaui batas anggaran.
-- [x] **Modul 4: Integrasi Dasbor (`DashboardView.tsx`)**:
-  - `MonthlyBudgetReport` dipasang di posisi strategis pada dasbor dengan transisi halus dan tata letak responsif di desktop maupun perangkat seluler.
-- [x] **Modul 5: Verifikasi & Pengujian Kualitas**:
-  - `tsc --noEmit` (`lint_applet`) lulus tanpa error.
-  - `compile_applet` berhasil dikompilasi.
-  - Test suite `categoryMatcher.test.ts` berhasil (8 lulus dari 8 tes).
-  - Server aktif dan merespons status HTTP 200.
+- [x] **Modul 1: Pembuatan `vercel.json`**:
+  - Konfigurasi schema Vercel, framework preset `vite`, rewrite routing `/api/(.*)` ke serverless function, dan rewrite fallback `/(.*)` ke `/index.html` (SPA routing).
+- [x] **Modul 2: Pembuatan Serverless Function `api/scan-receipt.ts`**:
+  - Endpoint Vercel Serverless Function berbasis `@google/genai` (`gemini-3.8-flash`) dengan batas payload 15MB untuk pemrosesan foto struk belanja di cloud.
+- [x] **Modul 3: Dokumentasi Panduan Deployment (`VERCEL_DEPLOYMENT_GUIDE.md`)**:
+  - Panduan komprehensif mengenai push repository ke GitHub, import project di Vercel, setup Environment Variable `GEMINI_API_KEY`, dan langkah krusial pendaftaran domain Vercel di Firebase Authentication (*Authorized Domains*).
+- [x] **Modul 4: Pengujian & Verifikasi**:
+  - `compile_applet` (`vite build`) berhasil tanpa error.
+  - `lint_applet` (`tsc --noEmit`) lulus 100%.
+  - Unit test `categoryMatcher.test.ts` berhasil (8/8 lulus).
