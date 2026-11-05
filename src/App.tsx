@@ -21,11 +21,24 @@ import { AddWalletModal } from './components/modals/AddWalletModal';
 import { PinLockModal } from './components/modals/PinLockModal';
 import { OnboardingTutorialModal } from './components/onboarding/OnboardingTutorialModal';
 import { useOnlineStatus } from './hooks/useOnlineStatus';
-import { WifiOff, Loader2 } from 'lucide-react';
+import { WifiOff, Loader2, UserX } from 'lucide-react';
+import { getTranslation } from './i18n/translations';
 
 const MainLayout: React.FC = () => {
-  const { user, isAuthLoading, activeTab, appPin, isAppUnlocked, announcementNotice } = useFinance();
+  const { 
+    user, 
+    currentUserProfile, 
+    isAdmin, 
+    logout, 
+    language,
+    isAuthLoading, 
+    activeTab, 
+    appPin, 
+    isAppUnlocked, 
+    announcementNotice 
+  } = useFinance();
   const isOnline = useOnlineStatus();
+  const t = getTranslation(language);
 
   // 1. Loading state while checking Firebase authentication
   if (isAuthLoading) {
@@ -45,6 +58,29 @@ const MainLayout: React.FC = () => {
   // 2. Authentication Barrier: Enforce login, NO guest mode allowed
   if (!user) {
     return <LoginView />;
+  }
+
+  // 2.1 Suspended User Account Barrier
+  if (currentUserProfile?.status === 'suspended' && !isAdmin) {
+    return (
+      <div className="min-h-screen w-full flex flex-col items-center justify-center bg-slate-950 p-6 text-center text-white">
+        <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-rose-500/20 text-rose-500 mb-4 border border-rose-500/30 shadow-lg shadow-rose-500/10">
+          <UserX className="h-8 w-8" />
+        </div>
+        <h1 className="text-xl font-black text-rose-400">
+          {t.userSuspendedTitle}
+        </h1>
+        <p className="mt-2 text-xs sm:text-sm text-slate-400 max-w-md leading-relaxed">
+          {t.userSuspendedDesc}
+        </p>
+        <button
+          onClick={logout}
+          className="mt-6 rounded-xl bg-slate-800 hover:bg-slate-700 px-5 py-2.5 text-xs font-bold text-white transition-colors cursor-pointer border border-slate-700 shadow-sm"
+        >
+          Keluar dari Akun (Logout)
+        </button>
+      </div>
+    );
   }
 
   // 3. Authenticated App Layout directly connected to Firestore

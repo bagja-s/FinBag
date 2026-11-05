@@ -1,6 +1,6 @@
 {
-  "summary": "Rencana pembuatan Halaman Konsol Admin khusus untuk pembuat aplikasi (sm.bagja@gmail.com) mencakup diagnostik sistem cloud, pemantauan database Firestore, pengujian Gemini AI, manajemen kategori global, dan pengumuman sistem.",
-  "updatedAt": "2026-11-05T02:58:29.327306885Z",
+  "summary": "Rencana implementasi fitur Manajemen Pengguna (User Management) di Halaman Konsol Admin FinBag, mencakup pencatatan metadata profil pengguna ke Firestore, pembaruan firestore.rules untuk hak akses Admin list & edit status akun, serta UI tabel direktori pengguna lengkap dengan filter, pencarian, dan tombol aksi suspend/aktifkan.",
+  "updatedAt": "2026-11-05T03:07:59.447520576Z",
   "requestFeedback": true,
   "userFacing": true
 }

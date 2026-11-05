@@ -1,77 +1,58 @@
-# FinBag - Halaman Konsol Admin Khusus Pembuat Aplikasi (Creator Admin Console)
+# FinBag - Rencana Implementasi: Manajemen Pengguna di Konsol Admin
 
-Rencana perancangan dan implementasi **Halaman Admin Khusus** bagi pembuat/pemilik aplikasi FinBag (`sm.bagja@gmail.com`), dengan kontrol hak akses berbasis peran (RBAC), diagnostik infrastruktur cloud realtime, dan alat manajemen platform.
-
----
-
-### User Review & Decisions Grounded in Clarifications
-
-> [!IMPORTANT]
-> **Keputusan Spesifikasi Hak Akses & Keamanan**:
-> 1. **Hak Akses Eksklusif**: Halaman Admin hanya dapat diakses oleh akun pembuat aplikasi (`sm.bagja@gmail.com`). Pengguna biasa tidak dapat melihat menu maupun mengakses rute admin ini.
-> 2. **Navigasi Khusus**: Tombol navigasi "Konsol Admin" dengan ikon tameng (`ShieldCheck` / `Crown`) otomatis muncul di Sidebar dan TopBar saat akun pembuat login.
-> 3. **Lencana Status**: Ditampilkan lencana verifikasi "Creator & Super Admin" pada profil akun.
+**Tujuan**: Memberikan kemampuan penuh kepada Creator / Super Admin (`sm.bagja@gmail.com`) untuk melihat daftar seluruh pengguna terdaftar, memeriksa status dan aktivitas mereka, serta mengelola status akun (Aktif / Ditangguhkan / Hapus Data) langsung dari Konsol Admin.
 
 ---
 
-### 1. Overview & Fitur Halaman Admin (`AdminView.tsx`)
+## Arsitektur & Skema Teknis
 
-Halaman Admin (`AdminView.tsx`) dirancang dengan antarmuka bertaraf *Executive Fintech Dashboard* yang menyajikan kendali menyeluruh:
+### 1. Sinkronisasi Profil Pengguna ke Firestore (`users/{userId}`)
+Setiap kali ada pengguna yang login dengan Google Auth di FinBag, aplikasi secara otomatis mencatat / memperbarui dokumen profil publik mereka:
+- `uid`: string (ID unik dari Firebase Auth)
+- `email`: string
+- `displayName`: string
+- `photoURL`: string
+- `role`: `'creator'` (untuk `sm.bagja@gmail.com`) atau `'user'`
+- `status`: `'active'` | `'suspended'` (default: `'active'`)
+- `createdAt`: ISO string timestamp
+- `lastLoginAt`: ISO string timestamp
+- `baseCurrency`: string (default: `'IDR'`)
+- `language`: string (default: `'id'`)
 
-1. **Ringkasan Akun Pembuat & Status Hak Akses**:
-   - Menampilkan email terverifikasi (`sm.bagja@gmail.com`), status autentikasi Firebase, dan tanda pengenal peran *Super Admin*.
-2. **Diagnostik Infrastruktur Cloud Real-Time**:
-   - **Cloud Firestore**: Status koneksi aktif database (`ai-studio-50c4b824-c198-4259-ab2d-c91de78366a7`) dengan tombol uji latensi (*Ping Test*).
-   - **Gemini 3.8 Flash AI**: Status kesiapan API scanner struk belanja (`/api/scan-receipt`).
-   - **Live FX Currency Engine**: Status feed nilai tukar mata uang dunia dan waktu pembaruan terakhir.
-   - **PWA Service Worker**: Status cache offline dan modul aplikasi.
-3. **Statistik & Ringkasan Data**:
-   - Jumlah dompet aktif terdaftar.
-   - Volume mutasi transaksi yang tersimpan di cloud.
-   - Pagu anggaran kategori dan target tabungan aktif.
-4. **Alat Pengujian & Utilitas Pengembang (Developer Utilities)**:
-   - Tombol *Force Refresh* kurs mata uang langsung dari API.
-   - Simulator & penguji respon JSON Gemini 3.8 Flash untuk parsing struk.
-   - Tinjauan skema kategori pengeluaran dan pagu default.
-5. **Papan Pengumuman Sistem (Broadcast Banner)**:
-   - Kemampuan bagi admin untuk menampilkan atau menyembunyikan banner informasi pemeliharaan/pembaruan ke seluruh aplikasi.
+### 2. Keamanan & Hak Akses Firestore (`firestore.rules`)
+- Admin (`sm.bagja@gmail.com` dengan `email_verified == true`) diberikan hak `allow list, get, update` pada koleksi `/users/{userId}`.
+- Pengguna reguler hanya boleh membaca dan mengubah profil miliknya sendiri (`isOwner(userId)`).
+- Pengguna reguler diblokir untuk memodifikasi field `role` atau `status` mereka sendiri.
 
----
-
-### 2. Technical Architecture & Component Tree
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                        MainLayout                           │
-├──────────────────────────────┬──────────────────────────────┤
-│    Sidebar / TopBar          │          AdminView           │
-│  [Konsol Admin] ◄──(isAdmin) │  ┌────────────────────────┐  │
-│                              │  │ 1. Profil Super Admin  │  │
-│                              │  ├────────────────────────┤  │
-│                              │  │ 2. Status Cloud & AI   │  │
-│                              │  ├────────────────────────┤  │
-│                              │  │ 3. Statistik Platform  │  │
-│                              │  ├────────────────────────┤  │
-│                              │  │ 4. Utilitas Pengembang │  │
-│                              │  └────────────────────────┘  │
-└──────────────────────────────┴──────────────────────────────┘
-```
+### 3. Pengecekan Akun Ditangguhkan (Suspension Enforcement)
+- Jika seorang pengguna ditandai dengan status `suspended` oleh Admin, saat mereka masuk ke aplikasi, akan ditampilkan layar peringatan ramah bahwa akun sedang ditangguhkan oleh Administrator dengan opsi logout atau hubungi bantuan.
 
 ---
 
-### 3. Rencana Tahapan Eksekusi (Implementation Steps)
+## Status Implementasi: SELESAI (COMPLETED)
 
-1. **Modul 1: Penambahan Kunci Terjemahan (i18n)**:
-   - Tambahkan label untuk menu Admin, status infrastruktur, diagnostik, dan utilitas ke dalam `src/i18n/translations.ts` (ID & EN).
-2. **Modul 2: Deteksi Hak Akses Admin di `FinanceContext.tsx`**:
-   - Tambahkan getter `isAdmin` (bernilai `true` jika `user?.email === 'sm.bagja@gmail.com'`).
-   - Izinkan tab `'admin'` pada navigasi `activeTab`.
-3. **Modul 3: Pembuatan Komponen `src/components/views/AdminView.tsx`**:
-   - Bangun tampilan dasbor admin modern dengan widget status cloud, statistik data, live ping test Firestore, dan kontrol pemeliharaan.
-4. **Modul 4: Integrasi Menu Navigasi (`Sidebar.tsx`, `TopBar.tsx`, & `App.tsx`)**:
-   - Tampilkan menu "Konsol Admin" di `Sidebar.tsx` dan lencana "Super Admin" di `TopBar.tsx` hanya jika `isAdmin === true`.
-   - Pasang rute rendering `AdminView` di `src/App.tsx`.
-5. **Modul 5: Verifikasi & Pengujian Kualitas**:
-   - Jalankan `compile_applet` dan `lint_applet` (`tsc --noEmit`).
-   - Jalankan test suite `categoryMatcher.test.ts`.
-   - Uji responsivitas dan integritas keamanan rute.
+- [x] **Modul 1: Model Data & Sinkronisasi Profil Otomatis (`src/types/finance.ts` & `src/context/FinanceContext.tsx`)**:
+  - Tipe `UserProfile` (`uid`, `email`, `displayName`, `photoURL`, `role`, `status`, `createdAt`, `lastLoginAt`) ditambahkan.
+  - Sinkronisasi metadata otomatis saat login ke Firestore doc `/users/{userId}`.
+  - Listener live untuk seluruh pengguna (`allUsers`) dan fungsi admin: `toggleUserStatus()`, `deleteUserProfile()`, dan `refreshUsers()`.
+
+- [x] **Modul 2: Pembaruan Aturan Keamanan (`firestore.rules` & `firebase-blueprint.json`)**:
+  - Helper `isAdmin()` berbasis verifikasi email `sm.bagja@gmail.com`.
+  - Hak `allow list: if isAdmin();` pada `/users`.
+  - Hak `allow update, delete: if isOwner(userId) || isAdmin();`.
+  - Aturan Firestore dideploy dan aktif.
+
+- [x] **Modul 3: Antarmuka Direktori & Manajemen Pengguna di `AdminView.tsx`**:
+  - Counter metrics: Total Pengguna, Pengguna Aktif (hijau), Akun Ditangguhkan (merah).
+  - Search bar interaktif (berdasarkan nama, email, atau UID) dan filter pill (Semua, Aktif, Ditangguhkan).
+  - Kartu baris pengguna dengan avatar, nama, email, badge status dan role (`Creator` vs `User`).
+  - Tombol aksi Tangguhkan / Aktifkan dan Hapus Akun dengan modal konfirmasi (`ConfirmationModal`).
+  - Akun Creator diproteksi secara otomatis agar tidak dapat ditangguhkan/dihapus secara sengaja.
+
+- [x] **Modul 4: Proteksi Akun Ditangguhkan di Tampilan Utama (`App.tsx`)**:
+  - Jika pengguna berstatus `suspended` masuk, aplikasi mengarahkan ke layar pemberitahuan ramah bahwa akun dinonaktifkan sementara oleh Administrator dengan tombol Logout.
+
+- [x] **Modul 5: Pengujian & Validasi Kualitas**:
+  - `pnpm exec tsc --noEmit` lulus dengan 0 error.
+  - `pnpm exec vite build` sukses menghasilkan bundel produksi teroptimasi.
+  - 8/8 unit tests lulus (100%).

@@ -206,6 +206,7 @@ export const translations = {
     testingPing: 'Menguji...',
     pingSuccess: 'Koneksi Firestore Berhasil',
     maintenanceModeTitle: 'Banner Pengumuman Pemeliharaan',
+    maintenanceModeDesc: 'Tampilkan banner pengumuman status pemeliharaan sistem di bagian atas aplikasi.',
     operational: 'Beroperasi Normal',
     creatorAccount: 'Akun Pembuat Aplikasi',
 

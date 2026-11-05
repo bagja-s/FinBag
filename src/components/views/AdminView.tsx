@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { useFinance } from '../../context/FinanceContext';
 import { getTranslation } from '../../i18n/translations';
 import { testFirestoreConnection } from '../../services/firebase';
+import { ConfirmationModal } from '../common/ConfirmationModal';
+import { UserProfile } from '../../types/finance';
 import { 
   ShieldCheck, 
   Database, 
@@ -20,7 +22,15 @@ import {
   Server,
   Zap,
   Globe2,
-  Cpu
+  Cpu,
+  Users,
+  UserCheck,
+  UserX,
+  Search,
+  Trash2,
+  ShieldAlert,
+  Mail,
+  Calendar
 } from 'lucide-react';
 
 export const AdminView: React.FC = () => {
@@ -36,6 +46,11 @@ export const AdminView: React.FC = () => {
     isRatesLoading,
     announcementNotice,
     setAnnouncementNotice,
+    allUsers,
+    isLoadingUsers,
+    refreshUsers,
+    toggleUserStatus,
+    deleteUserProfile,
     language 
   } = useFinance();
 
@@ -52,6 +67,15 @@ export const AdminView: React.FC = () => {
   // Announcement Input State
   const [noticeInput, setNoticeInput] = useState(announcementNotice || '');
   const [noticeSavedMsg, setNoticeSavedMsg] = useState(false);
+
+  // User Management State
+  const [userSearchQuery, setUserSearchQuery] = useState('');
+  const [userStatusFilter, setUserStatusFilter] = useState<'all' | 'active' | 'suspended'>('all');
+  const [actionModal, setActionModal] = useState<{
+    type: 'suspend' | 'activate' | 'delete';
+    targetUser: UserProfile;
+  } | null>(null);
+  const [isActionLoading, setIsActionLoading] = useState(false);
 
   const handleTestPing = async () => {
     setIsTestingPing(true);
@@ -121,6 +145,38 @@ export const AdminView: React.FC = () => {
     setNoticeSavedMsg(true);
     setTimeout(() => setNoticeSavedMsg(false), 3000);
   };
+
+  const handleConfirmUserAction = async () => {
+    if (!actionModal) return;
+    setIsActionLoading(true);
+    try {
+      if (actionModal.type === 'suspend' || actionModal.type === 'activate') {
+        await toggleUserStatus(actionModal.targetUser.uid, actionModal.targetUser.status);
+      } else if (actionModal.type === 'delete') {
+        await deleteUserProfile(actionModal.targetUser.uid);
+      }
+      setActionModal(null);
+    } catch (err) {
+      console.error('Failed to execute user action:', err);
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  const filteredUsers = allUsers.filter((u) => {
+    const query = userSearchQuery.toLowerCase().trim();
+    const matchesSearch = !query || 
+      (u.displayName?.toLowerCase().includes(query)) || 
+      (u.email?.toLowerCase().includes(query)) ||
+      (u.uid.toLowerCase().includes(query));
+    
+    const matchesStatus = userStatusFilter === 'all' || u.status === userStatusFilter;
+    return matchesSearch && matchesStatus;
+  });
+
+  const totalUsersCount = allUsers.length;
+  const activeUsersCount = allUsers.filter((u) => u.status === 'active').length;
+  const suspendedUsersCount = allUsers.filter((u) => u.status === 'suspended').length;
 
   if (!isAdmin) {
     return (
@@ -357,6 +413,246 @@ export const AdminView: React.FC = () => {
         </div>
       </div>
 
+      {/* User Directory & Management Section */}
+      <div className="rounded-3xl border border-slate-200 bg-white p-5 sm:p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800 gap-3">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-500/10 text-blue-500 dark:bg-blue-500/20">
+              <Users className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                  {t.userManagementTitle}
+                </h3>
+                <span className="rounded-full bg-blue-100 dark:bg-blue-950/60 px-2 py-0.5 text-[11px] font-mono font-bold text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900">
+                  {totalUsersCount}
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">
+                {t.userManagementSubtitle}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={refreshUsers}
+              disabled={isLoadingUsers}
+              className="flex items-center gap-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 text-blue-500 ${isLoadingUsers ? 'animate-spin' : ''}`} />
+              <span>{isLoadingUsers ? 'Memuat...' : 'Refresh'}</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Counter Summary Pills */}
+        <div className="grid grid-cols-3 gap-3 my-4">
+          <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40 p-3 flex flex-col">
+            <span className="text-[11px] font-medium text-slate-500">{t.totalUsers}</span>
+            <span className="text-xl font-black font-mono text-slate-900 dark:text-white mt-1">{totalUsersCount}</span>
+          </div>
+          <div className="rounded-2xl border border-emerald-100 dark:border-emerald-950/50 bg-emerald-50/50 dark:bg-emerald-950/20 p-3 flex flex-col">
+            <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400">{t.activeUsers}</span>
+            <span className="text-xl font-black font-mono text-emerald-600 dark:text-emerald-400 mt-1">{activeUsersCount}</span>
+          </div>
+          <div className="rounded-2xl border border-rose-100 dark:border-rose-950/50 bg-rose-50/50 dark:bg-rose-950/20 p-3 flex flex-col">
+            <span className="text-[11px] font-medium text-rose-600 dark:text-rose-400">{t.suspendedUsers}</span>
+            <span className="text-xl font-black font-mono text-rose-600 dark:text-rose-400 mt-1">{suspendedUsersCount}</span>
+          </div>
+        </div>
+
+        {/* Search & Filter Toolbar */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mb-4">
+          <div className="relative flex-1">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <input
+              type="text"
+              value={userSearchQuery}
+              onChange={(e) => setUserSearchQuery(e.target.value)}
+              placeholder={t.searchUserPlaceholder}
+              className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 pl-9 pr-3.5 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all font-medium"
+            />
+          </div>
+
+          <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-100 dark:bg-slate-800 self-start sm:self-auto">
+            <button
+              onClick={() => setUserStatusFilter('all')}
+              className={`px-3 py-1 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
+                userStatusFilter === 'all'
+                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
+                  : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              Semua
+            </button>
+            <button
+              onClick={() => setUserStatusFilter('active')}
+              className={`px-3 py-1 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
+                userStatusFilter === 'active'
+                  ? 'bg-emerald-500 text-white shadow-xs'
+                  : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              Aktif
+            </button>
+            <button
+              onClick={() => setUserStatusFilter('suspended')}
+              className={`px-3 py-1 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
+                userStatusFilter === 'suspended'
+                  ? 'bg-rose-500 text-white shadow-xs'
+                  : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              Ditangguhkan
+            </button>
+          </div>
+        </div>
+
+        {/* User Directory List */}
+        {filteredUsers.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 py-12 text-center">
+            <Users className="mx-auto h-8 w-8 text-slate-400 mb-2" />
+            <p className="text-xs text-slate-500 font-medium">
+              {t.noUsersFound}
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-2.5">
+            {filteredUsers.map((u) => {
+              const isCreatorAccount = u.email.toLowerCase() === 'sm.bagja@gmail.com';
+              const isSuspended = u.status === 'suspended';
+
+              return (
+                <div
+                  key={u.uid}
+                  className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-800/20 hover:border-slate-300 dark:hover:border-slate-700 transition-colors gap-3"
+                >
+                  {/* User Identity */}
+                  <div className="flex items-center gap-3 min-w-0">
+                    {u.photoURL ? (
+                      <img
+                        src={u.photoURL}
+                        alt={u.displayName}
+                        className="h-10 w-10 rounded-xl object-cover border border-slate-200 dark:border-slate-700 shrink-0"
+                      />
+                    ) : (
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white font-bold text-sm shrink-0 shadow-xs">
+                        {u.displayName.charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                          {u.displayName}
+                        </span>
+                        {isCreatorAccount ? (
+                          <span className="inline-flex items-center gap-1 rounded-md bg-amber-400/20 px-2 py-0.5 text-[10px] font-bold text-amber-500 dark:text-amber-300 border border-amber-400/30">
+                            👑 {t.roleCreator}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center rounded-md bg-slate-200/70 dark:bg-slate-700/60 px-2 py-0.5 text-[10px] font-semibold text-slate-600 dark:text-slate-300">
+                            {t.roleUser}
+                          </span>
+                        )}
+                        <span
+                          className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-bold ${
+                            isSuspended
+                              ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400 border border-rose-200 dark:border-rose-900'
+                              : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900'
+                          }`}
+                        >
+                          {isSuspended ? (
+                            <>
+                              <UserX className="h-2.5 w-2.5" />
+                              <span>{t.statusSuspended}</span>
+                            </>
+                          ) : (
+                            <>
+                              <UserCheck className="h-2.5 w-2.5" />
+                              <span>{t.statusActive}</span>
+                            </>
+                          )}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-3 text-[11px] text-slate-500 mt-1 flex-wrap font-mono">
+                        <span className="flex items-center gap-1">
+                          <Mail className="h-3 w-3" />
+                          <span>{u.email}</span>
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          <span>
+                            {t.lastSeen}:{' '}
+                            {new Date(u.lastLoginAt).toLocaleDateString(language === 'id' ? 'id-ID' : 'en-US', {
+                              day: 'numeric',
+                              month: 'short',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </span>
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+                    {isCreatorAccount ? (
+                      <span className="text-[11px] font-mono text-amber-500/80 italic px-2 py-1">
+                        Akun Pembuat (Protected)
+                      </span>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() =>
+                            setActionModal({
+                              type: isSuspended ? 'activate' : 'suspend',
+                              targetUser: u,
+                            })
+                          }
+                          className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold transition-colors cursor-pointer ${
+                            isSuspended
+                              ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs'
+                              : 'border border-amber-300 dark:border-amber-800 text-amber-600 dark:text-amber-400 bg-amber-50/50 dark:bg-amber-950/30 hover:bg-amber-100 dark:hover:bg-amber-900/40'
+                          }`}
+                        >
+                          {isSuspended ? (
+                            <>
+                              <UserCheck className="h-3.5 w-3.5" />
+                              <span>{t.activateUserAction}</span>
+                            </>
+                          ) : (
+                            <>
+                              <UserX className="h-3.5 w-3.5" />
+                              <span>{t.suspendUserAction}</span>
+                            </>
+                          )}
+                        </button>
+
+                        <button
+                          onClick={() =>
+                            setActionModal({
+                              type: 'delete',
+                              targetUser: u,
+                            })
+                          }
+                          title={t.deleteUserAction}
+                          className="flex h-8 w-8 items-center justify-center rounded-xl border border-rose-200 dark:border-rose-900/60 bg-rose-50/50 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/40 transition-colors cursor-pointer"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
       {/* Broadcast Announcement / Maintenance Banner Tool */}
       <div className="rounded-3xl border border-slate-200 bg-white p-5 sm:p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <div className="flex items-center gap-2 pb-3 border-b border-slate-100 dark:border-slate-800">
@@ -443,6 +739,44 @@ export const AdminView: React.FC = () => {
           ))}
         </div>
       </div>
+
+      {/* Confirmation Modal for User Management Actions */}
+      {actionModal && (
+        <ConfirmationModal
+          isOpen={true}
+          title={
+            actionModal.type === 'suspend'
+              ? t.suspendUserAction
+              : actionModal.type === 'activate'
+              ? t.activateUserAction
+              : t.deleteUserAction
+          }
+          message={
+            actionModal.type === 'suspend'
+              ? t.confirmSuspendUser
+              : actionModal.type === 'activate'
+              ? t.confirmActivateUser
+              : t.confirmDeleteUser
+          }
+          confirmText={
+            actionModal.type === 'suspend'
+              ? 'Tangguhkan'
+              : actionModal.type === 'activate'
+              ? 'Aktifkan'
+              : 'Hapus Akun'
+          }
+          cancelText="Batal"
+          variant={actionModal.type === 'activate' ? 'primary' : 'danger'}
+          isLoading={isActionLoading}
+          details={[
+            { label: 'Nama Pengguna', value: actionModal.targetUser.displayName },
+            { label: 'Email', value: actionModal.targetUser.email },
+            { label: 'UID', value: actionModal.targetUser.uid },
+          ]}
+          onConfirm={handleConfirmUserAction}
+          onCancel={() => setActionModal(null)}
+        />
+      )}
     </div>
   );
 };
