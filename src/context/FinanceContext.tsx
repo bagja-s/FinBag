@@ -143,11 +143,9 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     return (localStorage.getItem(`${LOCAL_STORAGE_PREFIX}theme`) as 'dark' | 'light') || 'dark';
   });
 
-  // Security PIN
-  const [appPin, setAppPinState] = useState<string | null>(() => {
-    return localStorage.getItem(`${LOCAL_STORAGE_PREFIX}pin`) || null;
-  });
-  const [isAppUnlocked, setIsAppUnlocked] = useState<boolean>(() => !localStorage.getItem(`${LOCAL_STORAGE_PREFIX}pin`));
+  // Security PIN (per-account, loaded after user auth)
+  const [appPin, setAppPinState] = useState<string | null>(null);
+  const [isAppUnlocked, setIsAppUnlocked] = useState<boolean>(true);
 
   const ADMIN_EMAILS = ['sm.bagja@gmail.com'];
   const isAdmin = !!user?.email && ADMIN_EMAILS.includes(user.email.toLowerCase());
@@ -243,11 +241,13 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
   // PIN Lock handlers
   const setAppPin = (pin: string | null) => {
     setAppPinState(pin);
+    if (!user) return;
+    const userPinKey = `${LOCAL_STORAGE_PREFIX}pin_${user.uid}`;
     if (pin) {
-      localStorage.setItem(`${LOCAL_STORAGE_PREFIX}pin`, pin);
+      localStorage.setItem(userPinKey, pin);
       setIsAppUnlocked(true);
     } else {
-      localStorage.removeItem(`${LOCAL_STORAGE_PREFIX}pin`);
+      localStorage.removeItem(userPinKey);
       setIsAppUnlocked(true);
     }
   };
@@ -296,6 +296,8 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
   useEffect(() => {
     if (!user) {
       setCurrentUserProfile(null);
+      setAppPinState(null);
+      setIsAppUnlocked(true);
       return;
     }
 
@@ -308,6 +310,19 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     const userId = user.uid;
     const nowIso = new Date().toISOString();
     const isCreatorEmail = user.email?.toLowerCase() === 'sm.bagja@gmail.com';
+
+    // Load account-specific PIN and migrate legacy global key
+    const userPinKey = `${LOCAL_STORAGE_PREFIX}pin_${userId}`;
+    const legacyPinKey = `${LOCAL_STORAGE_PREFIX}pin`;
+    const legacyPin = localStorage.getItem(legacyPinKey);
+    if (legacyPin && !localStorage.getItem(userPinKey)) {
+      // Migrate legacy global PIN to this user's scoped key
+      localStorage.setItem(userPinKey, legacyPin);
+    }
+    localStorage.removeItem(legacyPinKey); // Always purge legacy key
+    const savedPin = localStorage.getItem(userPinKey);
+    setAppPinState(savedPin);
+    setIsAppUnlocked(!savedPin); // Lock if PIN exists
 
     // Synchronize user profile in Firestore
     const userDocRef = doc(db, 'users', userId);
@@ -511,6 +526,8 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     setUser(null);
     setCurrentUserProfile(null);
     setAllUsers([]);
+    setAppPinState(null);
+    setIsAppUnlocked(true);
     setWallets([]);
     setTransactions([]);
     setGoals([]);
