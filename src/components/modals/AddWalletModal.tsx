@@ -4,6 +4,8 @@ import { useFinance } from '../../context/FinanceContext';
 import { getTranslation } from '../../i18n/translations';
 import { WalletType, SupportedCurrency } from '../../types/finance';
 import { X, Wallet, Edit3 } from 'lucide-react';
+import { motion } from 'motion/react';
+import { modalSpringVariants, backdropVariants } from '../../utils/motionVariants';
 
 export const AddWalletModal: React.FC = () => {
   const { 
@@ -102,7 +104,12 @@ export const AddWalletModal: React.FC = () => {
   if (typeof document === 'undefined') return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-300 ease-out">
+    <motion.div 
+      variants={backdropVariants}
+      initial="hidden"
+      animate="visible"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4"
+    >
       {/* Click outside backdrop */}
       <div 
         className="fixed inset-0"
@@ -110,8 +117,11 @@ export const AddWalletModal: React.FC = () => {
         aria-hidden="true"
       />
 
-      <div 
-        className="relative z-10 w-full max-w-md rounded-t-3xl sm:rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-900 animate-in slide-in-from-bottom-12 sm:slide-in-from-bottom-4 sm:zoom-in-95 duration-300 ease-out fill-mode-both"
+      <motion.div 
+        variants={modalSpringVariants}
+        initial="hidden"
+        animate="visible"
+        className="relative z-10 w-full max-w-md rounded-t-3xl sm:rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-900"
         role="dialog"
       >
         <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
@@ -246,8 +256,8 @@ export const AddWalletModal: React.FC = () => {
             </button>
           </div>
         </form>
-      </div>
-    </div>,
+      </motion.div>
+    </motion.div>,
     document.body
   );
 };

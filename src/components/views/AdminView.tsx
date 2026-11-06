@@ -51,10 +51,17 @@ export const AdminView: React.FC = () => {
     refreshUsers,
     toggleUserStatus,
     deleteUserProfile,
+    notificationPermission,
+    requestNotifications,
+    sendTestNotification,
     language 
   } = useFinance();
 
   const t = getTranslation(language);
+
+  // Notification Test in Admin
+  const [isTestingAdminNotification, setIsTestingAdminNotification] = useState(false);
+  const [adminNotificationStatusMsg, setAdminNotificationStatusMsg] = useState<string | null>(null);
 
   // Firestore Ping Test State
   const [isTestingPing, setIsTestingPing] = useState(false);
@@ -336,7 +343,7 @@ export const AdminView: React.FC = () => {
             </button>
           </div>
 
-          {/* 4. PWA Service Worker & App Cache */}
+          {/* 4. PWA & Web Push Notifications */}
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between">
@@ -344,20 +351,44 @@ export const AdminView: React.FC = () => {
                   <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-purple-500/10 text-purple-500 dark:bg-purple-500/20">
                     <Smartphone className="h-4 w-4" />
                   </div>
-                  <h3 className="text-xs font-bold text-slate-900 dark:text-white">PWA & Offline</h3>
+                  <h3 className="text-xs font-bold text-slate-900 dark:text-white">PWA & Notifikasi</h3>
                 </div>
                 <span className="inline-flex items-center gap-1 text-[10px] font-bold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/40 px-2 py-0.5 rounded-md">
-                  Manifest v2
+                  Web Push
                 </span>
               </div>
               <p className="mt-3 text-[11px] text-slate-500">
-                Aset ikon 192px & 512px terverifikasi di folder /public
+                PWA Manifest & Web Notification API
               </p>
+              {adminNotificationStatusMsg && (
+                <p className="mt-2 text-[10px] font-mono text-emerald-600 dark:text-emerald-400 font-bold">
+                  {adminNotificationStatusMsg}
+                </p>
+              )}
             </div>
 
-            <div className="mt-4 flex items-center justify-center gap-1 text-[11px] font-mono text-emerald-600 dark:text-emerald-400 bg-slate-50 dark:bg-slate-800 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700">
-              <CheckCircle2 className="h-3.5 w-3.5" />
-              <span>Offline Cache Siap</span>
+            <div className="mt-4 flex flex-col gap-1.5">
+              <button
+                onClick={async () => {
+                  setIsTestingAdminNotification(true);
+                  if (notificationPermission !== 'granted') {
+                    const perm = await requestNotifications();
+                    if (perm !== 'granted') {
+                      setAdminNotificationStatusMsg('Izin notifikasi belum diberikan');
+                      setIsTestingAdminNotification(false);
+                      return;
+                    }
+                  }
+                  const sent = await sendTestNotification();
+                  setAdminNotificationStatusMsg(sent ? '✓ Notifikasi uji terkirim' : '⚠️ Gagal mengirim notifikasi');
+                  setIsTestingAdminNotification(false);
+                  setTimeout(() => setAdminNotificationStatusMsg(null), 3500);
+                }}
+                disabled={isTestingAdminNotification}
+                className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+              >
+                <span>{isTestingAdminNotification ? 'Menguji...' : 'Uji Push Notification'}</span>
+              </button>
             </div>
           </div>
         </div>

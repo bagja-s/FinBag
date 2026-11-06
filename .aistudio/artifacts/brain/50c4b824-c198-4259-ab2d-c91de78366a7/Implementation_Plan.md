@@ -1,69 +1,38 @@
-# FinBag - Rencana Implementasi: Manajemen Pengguna di Konsol Admin
+# FinBag - Status Implementasi: Push Notifications & Sistem Motion Animasi
 
-**Tujuan**: Memberikan kemampuan penuh kepada Creator / Super Admin (`sm.bagja@gmail.com`) untuk melihat daftar seluruh pengguna terdaftar, memeriksa status dan aktivitas mereka, serta mengelola status akun (Aktif / Ditangguhkan / Hapus Data) langsung dari Konsol Admin.
-
----
-
-## Arsitektur & Skema Teknis
-
-### 1. Sinkronisasi Profil Pengguna ke Firestore (`users/{userId}`)
-Setiap kali ada pengguna yang login dengan Google Auth di FinBag, aplikasi secara otomatis mencatat / memperbarui dokumen profil publik mereka:
-- `uid`: string (ID unik dari Firebase Auth)
-- `email`: string
-- `displayName`: string
-- `photoURL`: string
-- `role`: `'creator'` (untuk `sm.bagja@gmail.com`) atau `'user'`
-- `status`: `'active'` | `'suspended'` (default: `'active'`)
-- `createdAt`: ISO string timestamp
-- `lastLoginAt`: ISO string timestamp
-- `baseCurrency`: string (default: `'IDR'`)
-- `language`: string (default: `'id'`)
-
-### 2. Keamanan & Hak Akses Firestore (`firestore.rules`)
-- Admin (`sm.bagja@gmail.com` dengan `email_verified == true`) diberikan hak `allow list, get, update` pada koleksi `/users/{userId}`.
-- Pengguna reguler hanya boleh membaca dan mengubah profil miliknya sendiri (`isOwner(userId)`).
-- Pengguna reguler diblokir untuk memodifikasi field `role` atau `status` mereka sendiri.
-
-### 3. Pengecekan Akun Ditangguhkan (Suspension Enforcement)
-- Jika seorang pengguna ditandai dengan status `suspended` oleh Admin, saat mereka masuk ke aplikasi, akan ditampilkan layar peringatan ramah bahwa akun sedang ditangguhkan oleh Administrator dengan opsi logout atau hubungi bantuan.
+**Status**: SELESAI (COMPLETED)
 
 ---
 
-## Rincian Modul & Langkah Kerja
+### Ringkasan Pengerjaan
 
-### Modul 1: Model Data & Sinkronisasi Profil Otomatis (`src/context/FinanceContext.tsx`)
-- Tambahkan interface `UserProfile` (`uid`, `email`, `displayName`, `photoURL`, `role`, `status`, `createdAt`, `lastLoginAt`).
-- Saat `onAuthStateChanged` mendeteksi pengguna baru atau login kembali:
-  - Lakukan `setDoc(doc(db, 'users', user.uid), { ...profileData }, { merge: true })` agar tidak menimpa status yang sudah diubah admin.
-- Berikan state `allUsers: UserProfile[]` dan fungsi `fetchAllUsers()`, `updateUserStatus(uid, status)`.
+#### 1. Sistem Push Notification PWA (`src/services/notificationService.ts`)
+- [x] **Web Notification API & Service Worker Integration**:
+  - Deteksi kompatibilitas browser (`isNotificationSupported()`).
+  - Permintaan izin browser interaktif (`requestNotificationPermission()`).
+  - Fungsi pengiriman `sendAppNotification()` dengan fallback ganda: Service Worker (`registration.showNotification`) dan Window Notification.
+- [x] **Pemicu Notifikasi Cerdas Otomatis (`FinanceContext.tsx`)**:
+  - **Peringatan Pagu Anggaran (Budget Alert)**: Terpicu otomatis saat mencatat pengeluaran jika pengeluaran kategori mencapai ≥80% atau ≥100% dari batas bulanan.
+  - **Perayaan Target Tabungan (Goal Milestone)**: Terpicu otomatis saat setoran membuat tabungan mencapai 100%.
+  - **Pengingat & Alat Uji**: Tombol "Kirim Notifikasi Uji" di tab **Tools & More** dan di **Konsol Admin**.
+- [x] **Dukungan Internasionalisasi (i18n)**:
+  - Seluruh teks status izin notifikasi dan template pesan tersedia dalam Bahasa Indonesia dan English.
 
-### Modul 2: Pembaruan Aturan Keamanan (`firestore.rules` & `firebase-blueprint.json`)
-- Tambahkan helper `isAdmin()` berbasis verifikasi email pembuat aplikasi.
-- Izinkan `allow list: if isAdmin();` pada `/users`.
-- Izinkan `allow update: if isOwner(userId) || isAdmin();` dengan proteksi field `role` dan `status`.
+#### 2. Sistem Motion & Micro-interactions (`motion/react` v12)
+- [x] **Preset Animasi Terpusat (`src/utils/motionVariants.ts`)**:
+  - `pageVariants`: Transisi halus fade & subtle vertical slide (220ms, ease cubic-bezier).
+  - `containerStaggerVariants`: Efek kemunculan bertingkat (*staggerChildren: 0.05s*).
+  - `cardItemVariants`: Spring physics alami (*stiffness: 350, damping: 26*).
+  - `modalSpringVariants`: Pop-up scale-in (*scale: 0.94 -> 1.0, stiffness: 380, damping: 28*).
+  - `backdropVariants`: Transisi lembut backdrop blur.
+- [x] **Penerapan pada Komponen Inti**:
+  - **`App.tsx`**: Seluruh navigasi antar-tab (Dashboard, Dompet, Kurs, Anggaran, Transaksi, Tools, Admin) kini bertransisi menggunakan `<AnimatePresence mode="wait">` dan `<motion.div>`.
+  - **`DashboardView.tsx`**: Daftar transaksi terakhir (*recent transactions*) mengadopsi kemunculan staggered bertingkat.
+  - **`WalletsView.tsx`**: Seluruh kartu dompet/rekening muncul berurutan dengan staggered spring physics dan efek hover lift (`whileHover={{ y: -3 }}`).
+  - **Modals (`ConfirmationModal.tsx`, `TransactionModal.tsx`, `AddWalletModal.tsx`, `PinLockModal.tsx`)**: Menggunakan spring scale-in dialog dan backdrop-blur yang presisi.
 
-### Modul 3: Antarmuka Direktori Pengguna di `AdminView.tsx`
-- Tambahkan tab/bagian baru **"Manajemen Pengguna" (User Directory)**:
-  - **Statistik Cepat**: Total Pengguna Terdaftar, Pengguna Aktif, Pengguna Ditangguhkan.
-  - **Kotak Pencarian**: Filter cepat berdasarkan nama atau alamat email pengguna.
-  - **Tabel Pengguna**:
-    - Kolom Avatar & Nama Lengkap
-    - Kolom Email & Lencana Verifikasi
-    - Kolom Peran (`CREATOR` emas, `USER` abu-abu)
-    - Kolom Tanggal Bergabung & Terakhir Aktif
-    - Kolom Status Akun (`Active` hijau, `Suspended` merah)
-  - **Aksi Cepat**:
-    - Tombol **Suspend / Aktifkan**: Mengubah status akses akun secara real-time.
-    - Tombol **Hapus Riwayat/Data**: Modal konfirmasi untuk membersihkan data atas permintaan user.
-
-### Modul 4: Proteksi Akun Ditangguhkan di Tampilan Utama (`App.tsx`)
-- Jika user terdeteksi memiliki `status === 'suspended'`, render banner / kartu pemberitahuan akun ditangguhkan yang mengunci aksi penambahan transaksi baru.
-
-### Modul 5: Pengujian & Validasi
-- Jalankan `compile_applet` dan `lint_applet` untuk menjamin tidak ada regresi tipe TypeScript.
-- Uji alur pembuatan akun baru, pembacaan daftar user oleh admin, dan toggle status suspend.
-
----
-
-## Konfirmasi Pengguna
-Apakah rencana arsitektur di atas sudah sesuai dengan kebutuhan Anda? Silakan klik tombol **Proceed** atau beri instruksi tambahan untuk memulai implementasi.
+#### 3. Verifikasi & Pengujian Mutu
+- [x] TypeScript validation (`tsc --noEmit`): 0 error.
+- [x] Vite production build (`vite build`): Sukses terbundel.
+- [x] Unit test suite (`categoryMatcher.test.ts` & `financeCalculations.test.ts`): 15/15 tes lulus (100%).
+- [x] Dev server aktif merespons HTTP 200 di port 3000.

@@ -23,6 +23,8 @@ import { ConfirmationModal } from '../common/ConfirmationModal';
 import { Transaction } from '../../types/finance';
 import { MonthlyBudgetReport } from '../dashboard/MonthlyBudgetReport';
 import { PWAInstallBanner } from '../common/PWAInstallBanner';
+import { motion } from 'motion/react';
+import { containerStaggerVariants, cardItemVariants } from '../../utils/motionVariants';
 
 export const DashboardView: React.FC = () => {
   const { 
@@ -288,15 +290,21 @@ export const DashboardView: React.FC = () => {
         {recentTxs.length === 0 ? (
           <p className="mt-6 text-center text-xs text-slate-400 py-6">{t.noTransactionsYet}</p>
         ) : (
-          <div className="mt-3 divide-y divide-slate-100 dark:divide-slate-800">
+          <motion.div 
+            variants={containerStaggerVariants} 
+            initial="hidden" 
+            animate="visible" 
+            className="mt-3 divide-y divide-slate-100 dark:divide-slate-800"
+          >
             {recentTxs.map((tx) => {
               const category = categories.find((c) => c.id === tx.categoryId);
               const wallet = wallets.find((w) => w.id === tx.sourceWalletId);
               const targetWallet = wallets.find((w) => w.id === tx.targetWalletId);
 
               return (
-                <div 
+                <motion.div 
                   key={tx.id} 
+                  variants={cardItemVariants}
                   className="group flex items-center justify-between gap-2 py-2 sm:py-2.5 px-1.5 sm:px-2.5 hover:bg-slate-50/80 dark:hover:bg-slate-800/40 rounded-xl transition-all duration-150"
                 >
                   {/* Left: Icon & Transaction Details */}
@@ -375,10 +383,10 @@ export const DashboardView: React.FC = () => {
                       </button>
                     </div>
                   </div>
-                </div>
+                </motion.div>
               );
             })}
-          </div>
+          </motion.div>
         )}
       </div>
 

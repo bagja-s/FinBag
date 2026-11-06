@@ -23,6 +23,8 @@ import { OnboardingTutorialModal } from './components/onboarding/OnboardingTutor
 import { useOnlineStatus } from './hooks/useOnlineStatus';
 import { WifiOff, Loader2, UserX } from 'lucide-react';
 import { getTranslation } from './i18n/translations';
+import { AnimatePresence, motion } from 'motion/react';
+import { pageVariants } from './utils/motionVariants';
 
 const MainLayout: React.FC = () => {
   const { 
@@ -117,15 +119,24 @@ const MainLayout: React.FC = () => {
             </div>
           )}
 
-          <div key={activeTab} className="animate-in fade-in-0 slide-in-from-bottom-3 duration-300 fill-mode-both ease-out">
-            {activeTab === 'dashboard' && <DashboardView />}
-            {activeTab === 'wallets' && <WalletsView />}
-            {activeTab === 'rates' && <ExchangeRatesView />}
-            {activeTab === 'budgets' && <BudgetsView />}
-            {activeTab === 'transactions' && <TransactionsView />}
-            {activeTab === 'tools' && <ToolsView />}
-            {activeTab === 'admin' && <AdminView />}
-          </div>
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeTab}
+              variants={pageVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              className="w-full"
+            >
+              {activeTab === 'dashboard' && <DashboardView />}
+              {activeTab === 'wallets' && <WalletsView />}
+              {activeTab === 'rates' && <ExchangeRatesView />}
+              {activeTab === 'budgets' && <BudgetsView />}
+              {activeTab === 'transactions' && <TransactionsView />}
+              {activeTab === 'tools' && <ToolsView />}
+              {activeTab === 'admin' && <AdminView />}
+            </motion.div>
+          </AnimatePresence>
         </main>
       </div>
 

@@ -233,6 +233,22 @@ export const translations = {
     noUsersFound: 'Tidak ada pengguna yang cocok dengan pencarian.',
     userSuspendedTitle: 'Akun Ditangguhkan',
     userSuspendedDesc: 'Akun Anda sedang ditangguhkan oleh Administrator. Silakan hubungi sm.bagja@gmail.com jika membutuhkan bantuan.',
+
+    // Push Notifications
+    notificationsTitle: 'Pemberitahuan & Notifikasi Push',
+    notificationsSubtitle: 'Peringatan otomatis pagu anggaran, target tabungan, dan pengingat harian di perangkat Anda',
+    notificationStatusGranted: 'Notifikasi Aktif',
+    notificationStatusDenied: 'Izin Notifikasi Ditolak Browser',
+    notificationStatusDefault: 'Belum Diaktifkan',
+    notificationStatusUnsupported: 'Browser Tidak Mendukung Web Notification',
+    enableNotifications: 'Aktifkan Notifikasi',
+    testNotificationBtn: 'Kirim Notifikasi Uji',
+    testNotificationSending: 'Mengirim...',
+    testNotificationSent: 'Notifikasi Uji Berhasil Terkirim!',
+    budgetAlertsSetting: 'Peringatan Pagu Anggaran (≥80%)',
+    goalMilestoneSetting: 'Notifikasi Target Tabungan Tercapai',
+    dailyReminderSetting: 'Pengingat Harian Catat Pengeluaran',
+    enableNotificationFirst: 'Mohon izinkan notifikasi browser terlebih dahulu.',
   },
   en: {
     appTitle: 'FinBag',
@@ -466,6 +482,22 @@ export const translations = {
     noUsersFound: 'No users matching search query.',
     userSuspendedTitle: 'Account Suspended',
     userSuspendedDesc: 'Your account is currently suspended by the System Administrator. Please reach out to sm.bagja@gmail.com for assistance.',
+
+    // Push Notifications
+    notificationsTitle: 'Push Notifications & Alerts',
+    notificationsSubtitle: 'Automated budget warnings, savings goal milestones, and daily logging reminders',
+    notificationStatusGranted: 'Notifications Active',
+    notificationStatusDenied: 'Notification Permission Blocked by Browser',
+    notificationStatusDefault: 'Not Enabled Yet',
+    notificationStatusUnsupported: 'Web Notifications Not Supported',
+    enableNotifications: 'Enable Notifications',
+    testNotificationBtn: 'Send Test Notification',
+    testNotificationSending: 'Sending...',
+    testNotificationSent: 'Test Notification Dispatched!',
+    budgetAlertsSetting: 'Budget Warnings (≥80%)',
+    goalMilestoneSetting: 'Savings Milestone Alerts',
+    dailyReminderSetting: 'Daily Logging Reminder',
+    enableNotificationFirst: 'Please allow browser notification permission first.',
   },
 };
 

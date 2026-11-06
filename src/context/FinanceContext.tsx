@@ -40,6 +40,15 @@ import {
   getDocs 
 } from 'firebase/firestore';
 import { User } from 'firebase/auth';
+import { 
+  getNotificationPermission, 
+  requestNotificationPermission, 
+  triggerBudgetAlertNotification, 
+  triggerGoalAchievedNotification, 
+  triggerTestNotification, 
+  NotificationPermissionStatus 
+} from '../services/notificationService';
+import { formatCurrency } from '../utils/financeCalculations';
 
 interface FinanceContextType {
   // User & Auth
@@ -56,6 +65,11 @@ interface FinanceContextType {
   logout: () => Promise<void>;
   announcementNotice: string | null;
   setAnnouncementNotice: (msg: string | null) => void;
+
+  // Push Notifications
+  notificationPermission: NotificationPermissionStatus;
+  requestNotifications: () => Promise<NotificationPermissionStatus>;
+  sendTestNotification: () => Promise<boolean>;
 
   // Preferences
   language: SupportedLanguage;
@@ -146,6 +160,21 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
   // Security PIN (per-account, loaded after user auth)
   const [appPin, setAppPinState] = useState<string | null>(null);
   const [isAppUnlocked, setIsAppUnlocked] = useState<boolean>(true);
+
+  // Push Notifications state
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermissionStatus>(() => {
+    return getNotificationPermission();
+  });
+
+  const requestNotifications = async (): Promise<NotificationPermissionStatus> => {
+    const perm = await requestNotificationPermission();
+    setNotificationPermission(perm);
+    return perm;
+  };
+
+  const sendTestNotification = async (): Promise<boolean> => {
+    return triggerTestNotification(language);
+  };
 
   const ADMIN_EMAILS = ['sm.bagja@gmail.com'];
   const isAdmin = !!user?.email && ADMIN_EMAILS.includes(user.email.toLowerCase());
@@ -569,6 +598,31 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
 
     setTransactions((prev) => [newTx, ...prev]);
 
+    // Push Notification trigger: check budget limits on expense transactions
+    if (newTx.type === 'expense' && newTx.categoryId) {
+      const category = categories.find((c) => c.id === newTx.categoryId);
+      if (category && category.monthlyLimit > 0) {
+        const currentMonthStr = newTx.date.substring(0, 7);
+        const existingExpenses = transactions
+          .filter((t) => t.type === 'expense' && t.categoryId === newTx.categoryId && t.date.startsWith(currentMonthStr))
+          .reduce((sum, t) => sum + convertCurrency(t.amount, t.currency, baseCurrency, exchangeRates.rates), 0);
+        const addedExpenseInBase = convertCurrency(newTx.amount, newTx.currency, baseCurrency, exchangeRates.rates);
+        const totalSpent = existingExpenses + addedExpenseInBase;
+        const limitInBase = category.monthlyLimit;
+        const percentage = (totalSpent / limitInBase) * 100;
+
+        if (percentage >= 80) {
+          triggerBudgetAlertNotification(
+            language === 'en' ? category.nameEn : category.name,
+            percentage,
+            formatCurrency(totalSpent, baseCurrency),
+            formatCurrency(limitInBase, baseCurrency),
+            language
+          ).catch(console.warn);
+        }
+      }
+    }
+
     // Sync to Firestore if authenticated
     if (user) {
       const txPath = `users/${user.uid}/transactions`;
@@ -823,6 +877,15 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     };
     setGoals((prev) => prev.map((g) => (g.id === goalId ? updatedGoal : g)));
 
+    // Push notification trigger: check if goal target is achieved
+    if (updatedGoal.currentAmount >= updatedGoal.targetAmount && goal.currentAmount < goal.targetAmount) {
+      triggerGoalAchievedNotification(
+        goal.title,
+        formatCurrency(updatedGoal.targetAmount, updatedGoal.currency),
+        language
+      ).catch(console.warn);
+    }
+
     // Record as expense from wallet
     await addTransaction({
       date: new Date().toISOString().split('T')[0],
@@ -952,6 +1015,9 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
         deleteUserProfile,
         isAdmin,
         isAuthLoading,
+        notificationPermission,
+        requestNotifications,
+        sendTestNotification,
         loginWithGoogle,
         logout,
         announcementNotice,

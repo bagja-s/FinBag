@@ -21,6 +21,8 @@ import {
   Loader2,
   CheckCircle2
 } from 'lucide-react';
+import { motion } from 'motion/react';
+import { modalSpringVariants, backdropVariants } from '../../utils/motionVariants';
 
 export const TransactionModal: React.FC = () => {
   const { 
@@ -290,7 +292,12 @@ export const TransactionModal: React.FC = () => {
   return (
     <>
       {createPortal(
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-300 ease-out">
+        <motion.div 
+          variants={backdropVariants}
+          initial="hidden"
+          animate="visible"
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4"
+        >
           {/* Backdrop click dismiss */}
           <div 
             className="fixed inset-0"
@@ -298,8 +305,11 @@ export const TransactionModal: React.FC = () => {
             aria-hidden="true"
           />
 
-          <div 
-            className="relative z-10 w-full max-w-lg rounded-t-3xl sm:rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-900 max-h-[92vh] overflow-y-auto animate-in slide-in-from-bottom-12 sm:slide-in-from-bottom-4 sm:zoom-in-95 duration-300 ease-out fill-mode-both"
+          <motion.div 
+            variants={modalSpringVariants}
+            initial="hidden"
+            animate="visible"
+            className="relative z-10 w-full max-w-lg rounded-t-3xl sm:rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-900 max-h-[92vh] overflow-y-auto"
             role="dialog"
             aria-modal="true"
           >
@@ -636,8 +646,8 @@ export const TransactionModal: React.FC = () => {
               </button>
             </div>
           </form>
-        </div>
-      </div>,
+        </motion.div>
+      </motion.div>,
       document.body
     )}
 

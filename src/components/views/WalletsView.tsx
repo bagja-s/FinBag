@@ -16,6 +16,8 @@ import {
 } from 'lucide-react';
 import { ConfirmationModal } from '../common/ConfirmationModal';
 import { WalletAccount } from '../../types/finance';
+import { motion } from 'motion/react';
+import { containerStaggerVariants, cardItemVariants } from '../../utils/motionVariants';
 
 export const WalletsView: React.FC = () => {
   const { 
@@ -110,15 +112,22 @@ export const WalletsView: React.FC = () => {
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <motion.div 
+          variants={containerStaggerVariants}
+          initial="hidden"
+          animate="visible"
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+        >
           {wallets.map((wallet) => {
             const Icon = getWalletIcon(wallet.type);
             const convertedToBase = convertCurrency(wallet.balance, wallet.currency, baseCurrency, exchangeRates.rates);
 
             return (
-              <div
+              <motion.div
                 key={wallet.id}
-                className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 transition-all duration-200 ease-out hover:-translate-y-1 hover:shadow-md hover:border-blue-500/50"
+                variants={cardItemVariants}
+                whileHover={{ y: -3 }}
+                className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 transition-all duration-200 ease-out hover:shadow-md hover:border-blue-500/50"
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-3 min-w-0">
@@ -189,10 +198,10 @@ export const WalletsView: React.FC = () => {
                     </span>
                   </div>
                 )}
-              </div>
+              </motion.div>
             );
           })}
-        </div>
+        </motion.div>
       )}
 
       {/* Confirmation Modal for Wallet Deletion */}
