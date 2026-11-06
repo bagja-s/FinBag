@@ -9,6 +9,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
+    "test": "tsx --test src/utils/*.test.ts",
     "lint": "tsc --noEmit"
   },
   "dependencies": {
