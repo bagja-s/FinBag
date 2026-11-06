@@ -1,20 +1,20 @@
 import React from 'react';
 import { useFinance } from '../context/FinanceContext';
 import { getTranslation } from '../i18n/translations';
-import { 
-  LayoutDashboard, 
-  Wallet, 
-  Plus, 
-  TrendingUp, 
-  Grid 
+import {
+  LayoutDashboard,
+  Wallet,
+  Plus,
+  History,
+  Settings
 } from 'lucide-react';
 
 export const BottomNav: React.FC = () => {
-  const { 
-    activeTab, 
-    setActiveTab, 
-    setIsTransactionModalOpen, 
-    language 
+  const {
+    activeTab,
+    setActiveTab,
+    setIsTransactionModalOpen,
+    language
   } = useFinance();
 
   const t = getTranslation(language);
@@ -67,36 +67,36 @@ export const BottomNav: React.FC = () => {
           </button>
         </div>
 
-        {/* Tab 4: Kurs Live */}
+        {/* Tab 4: Riwayat Transaksi */}
         <button
-          onClick={() => setActiveTab('rates')}
-          aria-label={t.navRates}
+          onClick={() => setActiveTab('transactions')}
+          aria-label={t.navTransactions}
           className={`relative flex flex-col items-center justify-center gap-0.5 py-1 transition-all duration-200 active:scale-90 cursor-pointer ${
-            activeTab === 'rates'
+            activeTab === 'transactions'
               ? 'text-blue-600 dark:text-blue-400 font-bold -translate-y-0.5'
               : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
           }`}
         >
-          <TrendingUp className={`h-5 w-5 transition-transform duration-200 ${activeTab === 'rates' ? 'scale-110 stroke-[2.5]' : ''}`} />
-          <span className="text-[10px] tracking-tight">{t.navRates}</span>
-          {activeTab === 'rates' && (
+          <History className={`h-5 w-5 transition-transform duration-200 ${activeTab === 'transactions' ? 'scale-110 stroke-[2.5]' : ''}`} />
+          <span className="text-[10px] tracking-tight">{t.navTransactions}</span>
+          {activeTab === 'transactions' && (
             <span className="h-1 w-1 rounded-full bg-blue-600 dark:bg-blue-400 animate-in zoom-in duration-200" />
           )}
         </button>
 
-        {/* Tab 5: Alat & Fitur Lebih */}
+        {/* Tab 5: Pengaturan */}
         <button
-          onClick={() => setActiveTab('tools')}
-          aria-label={t.navTools}
+          onClick={() => setActiveTab('settings')}
+          aria-label={t.navSettings}
           className={`relative flex flex-col items-center justify-center gap-0.5 py-1 transition-all duration-200 active:scale-90 cursor-pointer ${
-            activeTab === 'tools'
+            activeTab === 'settings'
               ? 'text-blue-600 dark:text-blue-400 font-bold -translate-y-0.5'
               : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
           }`}
         >
-          <Grid className={`h-5 w-5 transition-transform duration-200 ${activeTab === 'tools' ? 'scale-110 stroke-[2.5]' : ''}`} />
-          <span className="text-[10px] tracking-tight">{t.navTools}</span>
-          {activeTab === 'tools' && (
+          <Settings className={`h-5 w-5 transition-transform duration-200 ${activeTab === 'settings' ? 'scale-110 stroke-[2.5]' : ''}`} />
+          <span className="text-[10px] tracking-tight">{t.navSettings}</span>
+          {activeTab === 'settings' && (
             <span className="h-1 w-1 rounded-full bg-blue-600 dark:bg-blue-400 animate-in zoom-in duration-200" />
           )}
         </button>

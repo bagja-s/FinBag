@@ -1,24 +1,24 @@
 import React from 'react';
 import { useFinance } from '../context/FinanceContext';
 import { getTranslation } from '../i18n/translations';
-import { 
-  LayoutDashboard, 
-  Wallet, 
-  Plus, 
-  TrendingUp, 
-  PieChart, 
-  History, 
-  Grid, 
-  Download,
-  ShieldAlert
+import {
+  LayoutDashboard,
+  Wallet,
+  Plus,
+  TrendingUp,
+  PieChart,
+  History,
+  Settings,
+  ShieldAlert,
+  Download
 } from 'lucide-react';
 
 export const Sidebar: React.FC = () => {
-  const { 
-    activeTab, 
-    setActiveTab, 
+  const {
+    activeTab,
+    setActiveTab,
     isAdmin,
-    setIsTransactionModalOpen, 
+    setIsTransactionModalOpen,
     language,
     exportCSV,
     exportJSON,
@@ -33,8 +33,8 @@ export const Sidebar: React.FC = () => {
     { id: 'wallets', label: t.navWallets, icon: Wallet },
     { id: 'rates', label: t.navRates, icon: TrendingUp },
     { id: 'budgets', label: t.budgetStatus, icon: PieChart },
-    { id: 'transactions', label: t.recentTransactions, icon: History },
-    { id: 'tools', label: t.navTools, icon: Grid },
+    { id: 'transactions', label: t.navTransactions, icon: History },
+    { id: 'settings', label: t.navSettings, icon: Settings },
   ] as const;
 
   return (
@@ -113,10 +113,10 @@ export const Sidebar: React.FC = () => {
           <span>{t.exportJSON}</span>
         </button>
         <button
-          onClick={() => setActiveTab('tools')}
+          onClick={() => setActiveTab('settings')}
           className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800/60 transition-colors"
         >
-          <ShieldAlert className="h-3.5 w-3.5 text-slate-400" />
+          <Settings className="h-3.5 w-3.5 text-slate-400" />
           <span>{appPin ? t.pinEnabled : t.setPin}</span>
         </button>
       </div>

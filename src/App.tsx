@@ -14,6 +14,7 @@ import { ExchangeRatesView } from './components/views/ExchangeRatesView';
 import { BudgetsView } from './components/views/BudgetsView';
 import { TransactionsView } from './components/views/TransactionsView';
 import { ToolsView } from './components/views/ToolsView';
+import { SettingsView } from './components/views/SettingsView';
 import { AdminView } from './components/views/AdminView';
 import { LoginView } from './components/views/LoginView';
 import { TransactionModal } from './components/modals/TransactionModal';
@@ -134,6 +135,7 @@ const MainLayout: React.FC = () => {
               {activeTab === 'budgets' && <BudgetsView />}
               {activeTab === 'transactions' && <TransactionsView />}
               {activeTab === 'tools' && <ToolsView />}
+              {activeTab === 'settings' && <SettingsView />}
               {activeTab === 'admin' && <AdminView />}
             </motion.div>
           </AnimatePresence>

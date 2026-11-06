@@ -1,58 +1,36 @@
 import React, { useState } from 'react';
 import { useFinance } from '../../context/FinanceContext';
 import { getTranslation } from '../../i18n/translations';
-import { 
-  formatCurrency, 
-  calculate503020Rule, 
-  calculateSplitBill 
+import {
+  formatCurrency,
+  calculate503020Rule,
+  calculateSplitBill
 } from '../../utils/financeCalculations';
-import { 
-  Target, 
-  PieChart, 
-  Users, 
-  Lock, 
-  Plus, 
-  ShieldCheck, 
-  Plane, 
-  Laptop, 
-  CheckCircle2,
+import {
+  Target,
+  PieChart,
+  Users,
+  Plus,
   DollarSign,
-  Database,
-  AlertTriangle,
-  Trash2,
-  Sparkles,
-  Bell,
-  BellRing
+  CheckCircle2
 } from 'lucide-react';
 import { ConfirmationModal } from '../common/ConfirmationModal';
 
 export const ToolsView: React.FC = () => {
-  const { 
-    goals, 
-    addGoal, 
-    contributeToGoal, 
-    transactions, 
-    categories, 
-    wallets, 
-    baseCurrency, 
-    exchangeRates, 
-    appPin, 
-    setAppPin, 
+  const {
+    goals,
+    addGoal,
+    contributeToGoal,
+    transactions,
+    categories,
+    wallets,
+    baseCurrency,
+    exchangeRates,
     addTransaction,
-    clearAllDatabaseData,
-    openTutorial,
-    notificationPermission,
-    requestNotifications,
-    sendTestNotification,
-    language 
+    language
   } = useFinance();
 
   const t = getTranslation(language);
-
-  // Notification Test State
-  const [isRequestingNotification, setIsRequestingNotification] = useState(false);
-  const [isSendingTestNotification, setIsSendingTestNotification] = useState(false);
-  const [testNotificationSentMsg, setTestNotificationSentMsg] = useState(false);
 
   // Goal Creation Form State
   const [showAddGoal, setShowAddGoal] = useState(false);
@@ -71,29 +49,6 @@ export const ToolsView: React.FC = () => {
   const [billService, setBillService] = useState<string>('5');
   const [billPeople, setBillPeople] = useState<string>('4');
   const [billSuccessMsg, setBillSuccessMsg] = useState(false);
-
-  // PIN settings state
-  const [newPinInput, setNewPinInput] = useState('');
-  const [pinSuccessMsg, setPinSuccessMsg] = useState(false);
-
-  // Database reset state
-  const [showResetConfirm, setShowResetConfirm] = useState(false);
-  const [isResetting, setIsResetting] = useState(false);
-  const [resetSuccessMsg, setResetSuccessMsg] = useState(false);
-
-  const handleClearDatabase = async () => {
-    setIsResetting(true);
-    try {
-      await clearAllDatabaseData();
-      setShowResetConfirm(false);
-      setResetSuccessMsg(true);
-      setTimeout(() => setResetSuccessMsg(false), 4000);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setIsResetting(false);
-    }
-  };
 
   const currentMonthStr = new Date().toISOString().slice(0, 7);
   const rule503020 = calculate503020Rule(transactions, categories, currentMonthStr, exchangeRates.rates, baseCurrency);
@@ -149,15 +104,6 @@ export const ToolsView: React.FC = () => {
     setTimeout(() => setBillSuccessMsg(false), 3000);
   };
 
-  const handleSavePin = () => {
-    if (newPinInput.length === 4 && /^\d+$/.test(newPinInput)) {
-      setAppPin(newPinInput);
-      setNewPinInput('');
-      setPinSuccessMsg(true);
-      setTimeout(() => setPinSuccessMsg(false), 3000);
-    }
-  };
-
   return (
     <div className="space-y-6 pb-20 lg:pb-8">
       <div>
@@ -165,7 +111,7 @@ export const ToolsView: React.FC = () => {
           {t.toolsTitle}
         </h1>
         <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-          {language === 'id' ? 'Target tabungan, evaluasi 50/30/20, kalkulator split bill, dan keamanan PIN' : 'Savings pots, 50/30/20 rule, split bill calculator, and PIN lock'}
+          {language === 'id' ? 'Target tabungan, evaluasi 50/30/20, dan kalkulator split bill' : 'Savings pots, 50/30/20 rule, and split bill calculator'}
         </p>
       </div>
 
@@ -238,8 +184,8 @@ export const ToolsView: React.FC = () => {
               {language === 'id' ? 'Database Target Tabungan Masih Kosong' : 'No Financial Goals Found in Database'}
             </p>
             <p className="text-[11px] text-slate-400 mt-1 max-w-sm mx-auto">
-              {language === 'id' 
-                ? 'Tentukan target menabung Anda (cth: Dana Darurat, Liburan, Laptop). Data tersimpan langsung di database cloud Anda.' 
+              {language === 'id'
+                ? 'Tentukan target menabung Anda (cth: Dana Darurat, Liburan, Laptop). Data tersimpan langsung di database cloud Anda.'
                 : 'Set your personal savings goals (e.g. Emergency Fund, Travel, Laptop). Directly stored in your cloud database.'}
             </p>
             <button
@@ -473,253 +419,6 @@ export const ToolsView: React.FC = () => {
           </div>
         </div>
       </div>
-
-      {/* 4. Keamanan & Kunci PIN Privasi */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        <div className="flex items-center gap-2 pb-3 border-b border-slate-100 dark:border-slate-800">
-          <Lock className="h-5 w-5 text-rose-500" />
-          <h2 className="text-sm font-bold text-slate-900 dark:text-white">{t.securityPin}</h2>
-        </div>
-
-        <div className="mt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">
-              {appPin ? t.pinEnabled : t.pinDisabled}
-            </p>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Lindungi catatan saldo dan data transaksi dengan 4-digit PIN saat membuka aplikasi.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {appPin ? (
-              <button
-                onClick={() => setAppPin(null)}
-                className="rounded-xl border border-rose-300 bg-rose-50 px-4 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-100 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-400"
-              >
-                Hapus PIN
-              </button>
-            ) : (
-              <div className="flex items-center gap-2">
-                <input
-                  type="password"
-                  maxLength={4}
-                  placeholder="4-digit PIN"
-                  value={newPinInput}
-                  onChange={(e) => setNewPinInput(e.target.value)}
-                  className="h-9 w-28 rounded-xl border border-slate-200 bg-slate-50 px-3 text-center text-xs font-mono font-bold dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                />
-                <button
-                  onClick={handleSavePin}
-                  className="rounded-xl bg-blue-600 px-3.5 py-2 text-xs font-bold text-white hover:bg-blue-500"
-                >
-                  Aktifkan
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {pinSuccessMsg && (
-          <p className="mt-2 text-xs font-semibold text-emerald-500">
-            Pengaturan PIN berhasil diperbarui.
-          </p>
-        )}
-      </div>
-
-      {/* 5. Sistem Notifikasi & Peringatan Push */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-          <div className="flex items-center gap-2">
-            <BellRing className="h-5 w-5 text-amber-500" />
-            <h2 className="text-sm font-bold text-slate-900 dark:text-white">{t.notificationsTitle}</h2>
-          </div>
-          <span
-            className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
-              notificationPermission === 'granted'
-                ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800'
-                : notificationPermission === 'denied'
-                ? 'bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400 border border-rose-200 dark:border-rose-800'
-                : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'
-            }`}
-          >
-            <span
-              className={`h-1.5 w-1.5 rounded-full ${
-                notificationPermission === 'granted'
-                  ? 'bg-emerald-500 animate-pulse'
-                  : notificationPermission === 'denied'
-                  ? 'bg-rose-500'
-                  : 'bg-slate-400'
-              }`}
-            />
-            {notificationPermission === 'granted'
-              ? t.notificationStatusGranted
-              : notificationPermission === 'denied'
-              ? t.notificationStatusDenied
-              : t.notificationStatusDefault}
-          </span>
-        </div>
-
-        <div className="mt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">
-              {t.notificationsSubtitle}
-            </p>
-            <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">
-              Menerima peringatan saat kategori pengeluaran mencapai 80% dan 100% dari pagu bulanan, serta perayaan saat target tabungan tercapai.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2 shrink-0">
-            {notificationPermission !== 'granted' ? (
-              <button
-                onClick={async () => {
-                  setIsRequestingNotification(true);
-                  await requestNotifications();
-                  setIsRequestingNotification(false);
-                }}
-                disabled={isRequestingNotification || notificationPermission === 'denied'}
-                className="rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-500 transition-colors shadow-xs disabled:opacity-50 cursor-pointer"
-              >
-                {isRequestingNotification ? 'Menghubungkan...' : t.enableNotifications}
-              </button>
-            ) : (
-              <button
-                onClick={async () => {
-                  setIsSendingTestNotification(true);
-                  const ok = await sendTestNotification();
-                  setIsSendingTestNotification(false);
-                  if (ok) {
-                    setTestNotificationSentMsg(true);
-                    setTimeout(() => setTestNotificationSentMsg(false), 3000);
-                  }
-                }}
-                disabled={isSendingTestNotification}
-                className="flex items-center gap-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3.5 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer"
-              >
-                <Bell className="h-3.5 w-3.5 text-amber-500" />
-                <span>{isSendingTestNotification ? t.testNotificationSending : t.testNotificationBtn}</span>
-              </button>
-            )}
-          </div>
-        </div>
-
-        {testNotificationSentMsg && (
-          <p className="mt-2.5 text-xs font-semibold text-emerald-500 flex items-center gap-1.5">
-            <CheckCircle2 className="h-3.5 w-3.5" />
-            <span>{t.testNotificationSent}</span>
-          </p>
-        )}
-      </div>
-
-      {/* 6. Manajemen Database Cloud Firestore */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        <div className="flex items-center gap-2 pb-3 border-b border-slate-100 dark:border-slate-800">
-          <Database className="h-5 w-5 text-blue-500" />
-          <h2 className="text-sm font-bold text-slate-900 dark:text-white">
-            {language === 'id' ? 'Database Cloud Firestore' : 'Cloud Firestore Database'}
-          </h2>
-        </div>
-
-        <div className="mt-4 space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-            <div>
-              <p className="font-semibold text-slate-800 dark:text-slate-200">
-                {language === 'id' ? 'Koneksi Database Langsung (Tanpa Dummy / Mode Tamu)' : 'Direct Database Sync (Zero Dummy / No Guest Mode)'}
-              </p>
-              <p className="text-slate-400 mt-0.5">
-                {language === 'id'
-                  ? 'Setiap mutasi, rekening, dan tabungan Anda tersimpan secara persisten di database Cloud Firestore Anda.'
-                  : 'Every transaction, wallet, and goal is persistently stored in your personal Cloud Firestore database.'}
-              </p>
-            </div>
-            <span className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400 font-semibold text-[11px]">
-              <CheckCircle2 className="h-3.5 w-3.5" />
-              <span>Database Aktif</span>
-            </span>
-          </div>
-
-          <div className="rounded-xl border border-rose-200 dark:border-rose-900/40 bg-rose-50/50 dark:bg-rose-950/20 p-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="flex items-start gap-2.5">
-                <AlertTriangle className="h-4 w-4 text-rose-500 shrink-0 mt-0.5" />
-                <div>
-                  <h4 className="text-xs font-bold text-rose-800 dark:text-rose-300">
-                    {language === 'id' ? 'Kosongkan Seluruh Data Database' : 'Wipe All Data from Database'}
-                  </h4>
-                  <p className="text-[11px] text-rose-600/80 dark:text-rose-400/80 mt-0.5">
-                    {language === 'id' 
-                      ? 'Gunakan opsi ini jika Anda ingin mengosongkan seluruh rekening, mutasi, dan target yang tersimpan di cloud agar database benar-benar bersih 0.' 
-                      : 'Use this option if you wish to purge all stored wallets, transactions, and goals in the cloud so your database is completely clean.'}
-                  </p>
-                </div>
-              </div>
-
-              <button
-                onClick={() => setShowResetConfirm(true)}
-                className="shrink-0 flex items-center gap-1.5 rounded-xl border border-rose-300 bg-white px-3.5 py-2 text-xs font-bold text-rose-600 shadow-sm hover:bg-rose-100 dark:border-rose-800 dark:bg-rose-950/50 dark:text-rose-300 dark:hover:bg-rose-900/60 transition-colors cursor-pointer"
-              >
-                <Trash2 className="h-4 w-4" />
-                <span>{language === 'id' ? 'Kosongkan Database' : 'Clear Database'}</span>
-              </button>
-            </div>
-
-            {resetSuccessMsg && (
-              <p className="mt-3 text-xs font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
-                <CheckCircle2 className="h-4 w-4" />
-                <span>Seluruh data di database cloud Anda telah berhasil dikosongkan.</span>
-              </p>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* 6. Panduan & Tutorial Penggunaan */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/10 text-amber-500 dark:bg-amber-500/20">
-              <Sparkles className="h-5 w-5" />
-            </div>
-            <div>
-              <h2 className="text-sm font-bold text-slate-900 dark:text-white">
-                {t.repeatTutorial}
-              </h2>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                {language === 'id' 
-                  ? 'Buka kembali panduan interaktif fitur FinBag dan petunjuk instalasi PWA.' 
-                  : 'Replay the interactive FinBag feature tour and PWA installation guide.'}
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={openTutorial}
-            className="flex items-center justify-center gap-1.5 rounded-xl border border-blue-500/30 bg-blue-50 px-4 py-2.5 text-xs font-semibold text-blue-600 hover:bg-blue-100 dark:border-blue-500/20 dark:bg-blue-950/40 dark:text-blue-400 dark:hover:bg-blue-900/40 transition-colors cursor-pointer"
-          >
-            <Sparkles className="h-4 w-4" />
-            <span>{language === 'id' ? 'Buka Tutorial' : 'Open Tutorial'}</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Database Clear Confirmation Modal */}
-      <ConfirmationModal
-        isOpen={showResetConfirm}
-        title={t.confirmClearDbTitle}
-        message={t.confirmClearDbDesc}
-        confirmText={language === 'id' ? 'Ya, Bersihkan Seluruh Database' : 'Yes, Wipe All Database'}
-        cancelText={t.cancel}
-        variant="danger"
-        isLoading={isResetting}
-        onConfirm={handleClearDatabase}
-        onCancel={() => setShowResetConfirm(false)}
-        details={[
-          { label: 'Cloud Database', value: 'Google Cloud Firestore' },
-          { label: 'Dompet Tersimpan', value: `${wallets.length} rekening` },
-          { label: 'Riwayat Transaksi', value: `${transactions.length} transaksi` },
-          { label: 'Target Tabungan', value: `${goals.length} target` },
-        ]}
-      />
     </div>
   );
 };

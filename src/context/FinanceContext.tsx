@@ -64,7 +64,9 @@ interface FinanceContextType {
   loginWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
   announcementNotice: string | null;
-  setAnnouncementNotice: (msg: string | null) => void;
+  announcementExpiry: string | null; // ISO string timestamp
+  setAnnouncementNotice: (msg: string | null, expiry?: Date | null) => void;
+  clearAnnouncementExpiry: () => void;
 
   // Push Notifications
   notificationPermission: NotificationPermissionStatus;
@@ -87,8 +89,8 @@ interface FinanceContextType {
   lockApp: () => void;
 
   // Navigation & Modals
-  activeTab: 'dashboard' | 'wallets' | 'rates' | 'tools' | 'budgets' | 'transactions' | 'admin';
-  setActiveTab: (tab: 'dashboard' | 'wallets' | 'rates' | 'tools' | 'budgets' | 'transactions' | 'admin') => void;
+  activeTab: 'dashboard' | 'wallets' | 'rates' | 'tools' | 'budgets' | 'transactions' | 'admin' | 'settings';
+  setActiveTab: (tab: 'dashboard' | 'wallets' | 'rates' | 'tools' | 'budgets' | 'transactions' | 'admin' | 'settings') => void;
   isTransactionModalOpen: boolean;
   setIsTransactionModalOpen: (open: boolean) => void;
   isAddWalletModalOpen: boolean;
@@ -183,17 +185,34 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     return localStorage.getItem(`${LOCAL_STORAGE_PREFIX}announcement`);
   });
 
-  const setAnnouncementNotice = (msg: string | null) => {
+  const [announcementExpiry, setAnnouncementExpiryState] = useState<string | null>(() => {
+    return localStorage.getItem(`${LOCAL_STORAGE_PREFIX}announcement_expiry`);
+  });
+
+  const setAnnouncementNotice = (msg: string | null, expiry?: Date | null) => {
     setAnnouncementNoticeState(msg);
     if (msg) {
       localStorage.setItem(`${LOCAL_STORAGE_PREFIX}announcement`, msg);
     } else {
       localStorage.removeItem(`${LOCAL_STORAGE_PREFIX}announcement`);
     }
+    if (expiry) {
+      const expiryIso = expiry.toISOString();
+      setAnnouncementExpiryState(expiryIso);
+      localStorage.setItem(`${LOCAL_STORAGE_PREFIX}announcement_expiry`, expiryIso);
+    } else {
+      setAnnouncementExpiryState(null);
+      localStorage.removeItem(`${LOCAL_STORAGE_PREFIX}announcement_expiry`);
+    }
+  };
+
+  const clearAnnouncementExpiry = () => {
+    setAnnouncementExpiryState(null);
+    localStorage.removeItem(`${LOCAL_STORAGE_PREFIX}announcement_expiry`);
   };
 
   // Navigation
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'wallets' | 'rates' | 'tools' | 'budgets' | 'transactions' | 'admin'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'wallets' | 'rates' | 'tools' | 'budgets' | 'transactions' | 'admin' | 'settings'>('dashboard');
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
   const [isAddWalletModalOpen, setIsAddWalletModalOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
@@ -266,6 +285,28 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     setBaseCurrencyState(curr);
     localStorage.setItem(`${LOCAL_STORAGE_PREFIX}curr`, curr);
   };
+
+  // Announcement expiry checker - auto-clear banner when timer expires
+  useEffect(() => {
+    if (!announcementExpiry) return;
+    const expiryTime = new Date(announcementExpiry).getTime();
+    const now = Date.now();
+    if (expiryTime <= now) {
+      // Timer expired, clear the announcement
+      setAnnouncementNotice(null);
+      setAnnouncementExpiryState(null);
+      localStorage.removeItem(`${LOCAL_STORAGE_PREFIX}announcement_expiry`);
+    } else {
+      // Set a timeout to clear when it expires
+      const timeoutMs = expiryTime - now;
+      const timer = setTimeout(() => {
+        setAnnouncementNotice(null);
+        setAnnouncementExpiryState(null);
+        localStorage.removeItem(`${LOCAL_STORAGE_PREFIX}announcement_expiry`);
+      }, timeoutMs);
+      return () => clearTimeout(timer);
+    }
+  }, [announcementExpiry]);
 
   // PIN Lock handlers
   const setAppPin = (pin: string | null) => {
@@ -1021,7 +1062,9 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
         loginWithGoogle,
         logout,
         announcementNotice,
+        announcementExpiry,
         setAnnouncementNotice,
+        clearAnnouncementExpiry,
         language,
         setLanguage,
         baseCurrency,

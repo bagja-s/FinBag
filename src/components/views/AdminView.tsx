@@ -4,21 +4,21 @@ import { getTranslation } from '../../i18n/translations';
 import { testFirestoreConnection } from '../../services/firebase';
 import { ConfirmationModal } from '../common/ConfirmationModal';
 import { UserProfile } from '../../types/finance';
-import { 
-  ShieldCheck, 
-  Database, 
-  Sparkles, 
-  RefreshCw, 
-  Activity, 
-  Smartphone, 
-  Wallet, 
-  Receipt, 
-  Target, 
-  Layers, 
-  CheckCircle2, 
-  AlertCircle, 
-  Megaphone, 
-  Clock, 
+import {
+  ShieldCheck,
+  Database,
+  Sparkles,
+  RefreshCw,
+  Activity,
+  Smartphone,
+  Wallet,
+  Receipt,
+  Target,
+  Layers,
+  CheckCircle2,
+  AlertCircle,
+  Megaphone,
+  Clock,
   Server,
   Zap,
   Globe2,
@@ -30,22 +30,25 @@ import {
   Trash2,
   ShieldAlert,
   Mail,
-  Calendar
+  Calendar,
+  X
 } from 'lucide-react';
 
 export const AdminView: React.FC = () => {
-  const { 
-    user, 
-    isAdmin, 
-    wallets, 
-    transactions, 
-    categories, 
-    goals, 
-    exchangeRates, 
-    refreshExchangeRates, 
+  const {
+    user,
+    isAdmin,
+    wallets,
+    transactions,
+    categories,
+    goals,
+    exchangeRates,
+    refreshExchangeRates,
     isRatesLoading,
     announcementNotice,
+    announcementExpiry,
     setAnnouncementNotice,
+    clearAnnouncementExpiry,
     allUsers,
     isLoadingUsers,
     refreshUsers,
@@ -54,7 +57,7 @@ export const AdminView: React.FC = () => {
     notificationPermission,
     requestNotifications,
     sendTestNotification,
-    language 
+    language
   } = useFinance();
 
   const t = getTranslation(language);
@@ -74,6 +77,10 @@ export const AdminView: React.FC = () => {
   // Announcement Input State
   const [noticeInput, setNoticeInput] = useState(announcementNotice || '');
   const [noticeSavedMsg, setNoticeSavedMsg] = useState(false);
+  
+  // Announcement Expiry State
+  const [expiryInput, setExpiryInput] = useState(announcementExpiry ? announcementExpiry.slice(0, 16) : '');
+  const [expirySavedMsg, setExpirySavedMsg] = useState<string | null>(null);
 
   // User Management State
   const [userSearchQuery, setUserSearchQuery] = useState('');
@@ -151,6 +158,30 @@ export const AdminView: React.FC = () => {
     setAnnouncementNotice(null);
     setNoticeSavedMsg(true);
     setTimeout(() => setNoticeSavedMsg(false), 3000);
+  };
+
+  const handleSaveExpiry = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (expiryInput.trim()) {
+      const expiryDate = new Date(expiryInput);
+      if (!isNaN(expiryDate.getTime())) {
+        setAnnouncementNotice(announcementNotice, expiryDate);
+        setExpirySavedMsg(t.maintenanceExpirySet);
+      } else {
+        setExpirySavedMsg('Format tanggal tidak valid');
+      }
+    } else {
+      clearAnnouncementExpiry();
+      setExpirySavedMsg(t.maintenanceExpiryCleared);
+    }
+    setTimeout(() => setExpirySavedMsg(null), 3000);
+  };
+
+  const handleClearExpiry = () => {
+    clearAnnouncementExpiry();
+    setExpiryInput('');
+    setExpirySavedMsg(t.maintenanceExpiryCleared);
+    setTimeout(() => setExpirySavedMsg(null), 3000);
   };
 
   const handleConfirmUserAction = async () => {
@@ -732,6 +763,61 @@ export const AdminView: React.FC = () => {
             )}
           </div>
         </form>
+
+        {/* Expiry Timer Section */}
+        <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800">
+          <form onSubmit={handleSaveExpiry} className="space-y-3">
+            <div>
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2 block">
+                {t.maintenanceExpiryLabel}
+              </label>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <input
+                  type="datetime-local"
+                  value={expiryInput}
+                  onChange={(e) => setExpiryInput(e.target.value)}
+                  className="flex-1 h-10 rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs dark:border-slate-700 dark:bg-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <button
+                  type="button"
+                  onClick={handleClearExpiry}
+                  className="shrink-0 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                >
+                  {t.maintenanceExpiryCleared.split(' ')[0]}
+                </button>
+              </div>
+              <p className="mt-1 text-[10px] text-slate-400">{t.maintenanceExpiryHelper}</p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="submit"
+                className="rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-md shadow-blue-600/20 hover:bg-blue-500 transition-colors cursor-pointer"
+              >
+                Simpan Timer
+              </button>
+              {expirySavedMsg && (
+                <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                  <CheckCircle2 className="h-3.5 w-3.5" /> {expirySavedMsg}
+                </span>
+              )}
+            </div>
+          </form>
+
+          {announcementExpiry && (
+            <div className="mt-3 p-3 rounded-xl bg-amber-50/50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/40">
+              <div className="flex items-center gap-2 text-xs">
+                <Clock className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                <span className="font-semibold text-amber-800 dark:text-amber-200">
+                  {t.maintenanceExpirySet}
+                </span>
+                <span className="font-mono text-amber-600 dark:text-amber-400">
+                  {new Date(announcementExpiry).toLocaleString(language === 'id' ? 'id-ID' : 'en-US')}
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Global Categories Directory Inspection */}
@@ -799,11 +885,6 @@ export const AdminView: React.FC = () => {
           cancelText="Batal"
           variant={actionModal.type === 'activate' ? 'primary' : 'danger'}
           isLoading={isActionLoading}
-          details={[
-            { label: 'Nama Pengguna', value: actionModal.targetUser.displayName },
-            { label: 'Email', value: actionModal.targetUser.email },
-            { label: 'UID', value: actionModal.targetUser.uid },
-          ]}
           onConfirm={handleConfirmUserAction}
           onCancel={() => setActionModal(null)}
         />
