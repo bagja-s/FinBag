@@ -40,8 +40,9 @@ export const WalletsView: React.FC = () => {
     switch (type) {
       case 'bank': return Building2;
       case 'cash': return Coins;
+      case 'credit': return CreditCard;
       case 'investment': return PiggyBank;
-      default: return CreditCard;
+      default: return Wallet;
     }
   };
 
@@ -142,7 +143,7 @@ export const WalletsView: React.FC = () => {
                         {wallet.name}
                       </h3>
                       <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                        {wallet.type === 'bank' ? t.bank : wallet.type === 'cash' ? t.cash : wallet.type === 'investment' ? t.investment : t.ewallet}
+                        {wallet.type === 'bank' ? t.bank : wallet.type === 'cash' ? t.cash : wallet.type === 'credit' ? t.creditCard : wallet.type === 'investment' ? t.investment : t.ewallet}
                       </p>
                     </div>
                   </div>

@@ -25,8 +25,9 @@
       "type": "object",
       "properties": {
         "name": { "type": "string", "maxLength": 100 },
-        "type": { "type": "string", "enum": ["cash", "bank", "ewallet", "investment"] },
+        "type": { "type": "string", "enum": ["cash", "bank", "ewallet", "credit", "investment"] },
         "balance": { "type": "number" },
+        "initialBalance": { "type": "number" },
         "currency": { "type": "string", "maxLength": 5 },
         "color": { "type": "string", "maxLength": 30 },
         "accountNumber": { "type": "string", "maxLength": 50 },

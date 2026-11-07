@@ -28,7 +28,19 @@ Fitur ini memungkinkan pengguna untuk memilih secara terperinci jenis pemberitah
   - **Toggle Switch** interaktif dengan animasi transisi yang mulus.
   - Pesan peringatan jika izin notifikasi sistem browser belum diizinkan.
 
-### 4. Hasil Pengujian & Verifikasi
+### 4. Perbaikan Persistensi Saldo Dompet & Kategori Kartu Kredit (Credit Card)
+- **Akar Masalah**: Sebelumnya mutasi transaksi (`addTransaction`, `updateTransaction`, `deleteTransaction`) hanya memperbarui state React lokal dan menyimpan catatan transaksi ke sub-koleksi `users/{userId}/transactions`, tanpa menyinkronkan saldo dompet yang terpengaruh ke sub-koleksi `users/{userId}/wallets`. Akibatnya, saat halaman di-reload, `onSnapshot` Firestore mengambil data dompet dengan saldo sebelum transaksi, menyebabkan saldo dompet dan kekayaan bersih tampak kembali ke semula.
+- **Solusi yang Diterapkan**:
+  1. **Persistensi Realtime**: Pada `addTransaction`, `updateTransaction`, dan `deleteTransaction`, setiap dompet yang terpengaruh (sumber maupun tujuan transfer) langsung diperbarui saldonya ke Firestore (`users/{userId}/wallets/{walletId}`).
+  2. **Auto-Rekonsiliasi Cerdas**: Menambahkan rekonsiliasi otomatis saat aplikasi pertama kali dimuat; jika ada dompet lama dengan transaksi yang belum tersinkron, sistem menghitung delta transaksi secara otomatis, memperbarui saldo dompet, dan menyimpannya secara persisten ke Firestore.
+  3. **Kategori Dompet Baru `credit` (Kartu Kredit)**:
+     - Menambahkan tipe `'credit'` pada `WalletType` (`src/types/finance.ts`).
+     - Memperbarui skema `firebase-blueprint.json` dan aturan keamanan Firestore `firestore.rules` (`isValidWallet`) agar mengizinkan tipe `credit`.
+     - Aturan keamanan berhasil di-deploy ke Cloud Firestore (`deploy_firebase`).
+     - Menyediakan opsi "Kartu Kredit" (Credit Card) di `AddWalletModal.tsx` dengan ikon visual `CreditCard` di `WalletsView.tsx` dan `DashboardView.tsx`.
+     - Menambahkan translasi multi-bahasa (ID: "Kartu Kredit", EN: "Credit Card").
+
+### 5. Hasil Pengujian & Verifikasi
 - Kompilasi `compile_applet`: **Berhasil (0 error)**.
 - Linting TypeScript `lint_applet`: **0 error**.
 - Unit Test `npm test`: **15/15 Lolos**.

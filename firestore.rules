@@ -44,8 +44,9 @@ service cloud.firestore {
       return data.keys().hasAll(['name', 'type', 'balance', 'currency', 'userId']) &&
         data.userId == userId &&
         data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
-        data.type in ['cash', 'bank', 'ewallet', 'investment'] &&
+        data.type in ['cash', 'bank', 'ewallet', 'credit', 'investment'] &&
         data.balance is number &&
+        (!('initialBalance' in data) || data.initialBalance is number) &&
         data.currency is string && data.currency.size() <= 5;
     }
 

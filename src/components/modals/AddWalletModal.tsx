@@ -183,6 +183,7 @@ export const AddWalletModal: React.FC = () => {
                 <option value="bank">{t.bank}</option>
                 <option value="cash">{t.cash}</option>
                 <option value="ewallet">{t.ewallet}</option>
+                <option value="credit">{t.creditCard}</option>
                 <option value="investment">{t.investment}</option>
               </select>
             </div>

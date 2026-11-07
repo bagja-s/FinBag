@@ -161,7 +161,7 @@ export const DashboardView: React.FC = () => {
                   {formatCurrency(wallet.balance, wallet.currency)}
                 </p>
                 <p className="text-[11px] text-slate-500 mt-1 truncate">
-                  {wallet.accountNumber || (wallet.type === 'cash' ? t.cash : t.bank)}
+                  {wallet.accountNumber || (wallet.type === 'cash' ? t.cash : wallet.type === 'credit' ? t.creditCard : wallet.type === 'investment' ? t.investment : wallet.type === 'ewallet' ? t.ewallet : t.bank)}
                 </p>
               </div>
             ))}

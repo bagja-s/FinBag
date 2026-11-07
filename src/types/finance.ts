@@ -2,7 +2,7 @@ export type SupportedCurrency = 'IDR' | 'USD' | 'EUR' | 'SGD' | 'MYR' | 'JPY' | 
 
 export type SupportedLanguage = 'id' | 'en';
 
-export type WalletType = 'cash' | 'bank' | 'ewallet' | 'investment';
+export type WalletType = 'cash' | 'bank' | 'ewallet' | 'credit' | 'investment';
 
 export type TransactionType = 'expense' | 'income' | 'transfer';
 
@@ -11,6 +11,7 @@ export interface WalletAccount {
   name: string;
   type: WalletType;
   balance: number;
+  initialBalance?: number;
   currency: SupportedCurrency;
   color: string;
   accountNumber?: string;

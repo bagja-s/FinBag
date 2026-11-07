@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { 
   SupportedCurrency, 
   SupportedLanguage, 
@@ -341,6 +341,59 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     lastUpdated: 'Loading...',
   });
   const [isRatesLoading, setIsRatesLoading] = useState(false);
+
+  const reconciledOnceRef = useRef(false);
+
+  // Auto-reconcile legacy wallets if initialBalance was never persisted
+  useEffect(() => {
+    if (!user || wallets.length === 0 || isAuthLoading || reconciledOnceRef.current) {
+      return;
+    }
+
+    let needsUpdate = false;
+    const reconciledWallets = wallets.map((w) => {
+      if (w.initialBalance === undefined) {
+        needsUpdate = true;
+        let netTxDelta = 0;
+        for (const t of transactions) {
+          if (t.type === 'expense' && t.sourceWalletId === w.id) {
+            netTxDelta -= t.amount;
+          } else if (t.type === 'income' && t.sourceWalletId === w.id) {
+            netTxDelta += t.amount;
+          } else if (t.type === 'transfer') {
+            if (t.sourceWalletId === w.id) {
+              netTxDelta -= t.amount;
+            } else if (t.targetWalletId === w.id) {
+              const converted = convertCurrency(t.amount, t.currency, w.currency, exchangeRates.rates);
+              netTxDelta += converted;
+            }
+          }
+        }
+
+        const initialBalance = w.balance;
+        const recalculatedBalance = initialBalance + netTxDelta;
+        return {
+          ...w,
+          initialBalance,
+          balance: recalculatedBalance,
+        };
+      }
+      return w;
+    });
+
+    if (needsUpdate) {
+      reconciledOnceRef.current = true;
+      setWallets(reconciledWallets);
+      for (const w of reconciledWallets) {
+        if (w.initialBalance !== undefined) {
+          const wPath = `users/${user.uid}/wallets`;
+          setDoc(doc(db, wPath, w.id), cleanFirestoreData(w), { merge: true }).catch((err) => {
+            console.warn('Reconciliation persist warning:', err);
+          });
+        }
+      }
+    }
+  }, [user, wallets, transactions, isAuthLoading, exchangeRates.rates]);
 
   // Theme synchronization with HTML tag
   useEffect(() => {
@@ -707,6 +760,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     setTransactions([]);
     setGoals([]);
     setAuditLogs([]);
+    reconciledOnceRef.current = false;
   };
 
   // Audit logging helper
@@ -750,8 +804,9 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     };
 
     // Update balances of associated wallets
+    let updatedWalletsList: WalletAccount[] = [];
     setWallets((prevWallets) => {
-      return prevWallets.map((w) => {
+      const updated = prevWallets.map((w) => {
         let newBalance = w.balance;
         if (newTx.type === 'expense' && w.id === newTx.sourceWalletId) {
           newBalance -= newTx.amount;
@@ -771,6 +826,8 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
         }
         return { ...w, balance: newBalance };
       });
+      updatedWalletsList = updated;
+      return updated;
     });
 
     setTransactions((prev) => [newTx, ...prev]);
@@ -825,6 +882,19 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
       } catch (err) {
         handleFirestoreError(err, OperationType.WRITE, txPath);
       }
+
+      // Persist updated wallet balances to Firestore
+      const affectedWalletIds = [newTx.sourceWalletId, newTx.targetWalletId].filter(Boolean);
+      for (const w of updatedWalletsList) {
+        if (affectedWalletIds.includes(w.id)) {
+          const wPath = `users/${user.uid}/wallets`;
+          try {
+            await setDoc(doc(db, wPath, w.id), cleanFirestoreData(w), { merge: true });
+          } catch (err) {
+            handleFirestoreError(err, OperationType.WRITE, wPath);
+          }
+        }
+      }
     }
 
     // Record audit log
@@ -853,8 +923,9 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     };
 
     // Recalculate wallet balances: rollback oldTx and apply updatedTx
+    let updatedWalletsList: WalletAccount[] = [];
     setWallets((prevWallets) => {
-      return prevWallets.map((w) => {
+      const updated = prevWallets.map((w) => {
         let newBalance = w.balance;
 
         // 1. Rollback old transaction impact
@@ -893,6 +964,8 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
 
         return { ...w, balance: newBalance };
       });
+      updatedWalletsList = updated;
+      return updated;
     });
 
     setTransactions((prev) => prev.map((t) => (t.id === id ? updatedTx : t)));
@@ -904,6 +977,25 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
         await setDoc(doc(db, txPath, id), cleanFirestoreData(updatedTx));
       } catch (err) {
         handleFirestoreError(err, OperationType.WRITE, txPath);
+      }
+
+      // Persist affected wallet balances to Firestore
+      const affectedWalletIds = [
+        oldTx.sourceWalletId,
+        oldTx.targetWalletId,
+        updatedTx.sourceWalletId,
+        updatedTx.targetWalletId,
+      ].filter(Boolean);
+
+      for (const w of updatedWalletsList) {
+        if (affectedWalletIds.includes(w.id)) {
+          const wPath = `users/${user.uid}/wallets`;
+          try {
+            await setDoc(doc(db, wPath, w.id), cleanFirestoreData(w), { merge: true });
+          } catch (err) {
+            handleFirestoreError(err, OperationType.WRITE, wPath);
+          }
+        }
       }
     }
 
@@ -920,9 +1012,10 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     const txToDelete = transactions.find((t) => t.id === id);
     if (!txToDelete) return;
 
+    let updatedWalletsList: WalletAccount[] = [];
     // Rollback wallet balance
     setWallets((prevWallets) => {
-      return prevWallets.map((w) => {
+      const updated = prevWallets.map((w) => {
         let newBalance = w.balance;
         if (txToDelete.type === 'expense' && w.id === txToDelete.sourceWalletId) {
           newBalance += txToDelete.amount;
@@ -941,6 +1034,8 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
         }
         return { ...w, balance: newBalance };
       });
+      updatedWalletsList = updated;
+      return updated;
     });
 
     setTransactions((prev) => prev.filter((t) => t.id !== id));
@@ -951,6 +1046,19 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
         await deleteDoc(doc(db, txPath, id));
       } catch (err) {
         handleFirestoreError(err, OperationType.DELETE, txPath);
+      }
+
+      // Persist affected wallet balances to Firestore
+      const affectedWalletIds = [txToDelete.sourceWalletId, txToDelete.targetWalletId].filter(Boolean);
+      for (const w of updatedWalletsList) {
+        if (affectedWalletIds.includes(w.id)) {
+          const wPath = `users/${user.uid}/wallets`;
+          try {
+            await setDoc(doc(db, wPath, w.id), cleanFirestoreData(w), { merge: true });
+          } catch (err) {
+            handleFirestoreError(err, OperationType.WRITE, wPath);
+          }
+        }
       }
     }
 
@@ -970,6 +1078,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
       ...walletData,
       id: newId,
       userId: user?.uid,
+      initialBalance: walletData.initialBalance ?? walletData.balance,
     };
 
     setWallets((prev) => [...prev, newWallet]);

@@ -48,6 +48,7 @@ export const translations = {
     cash: 'Kas Tunai',
     bank: 'Rekening Bank',
     ewallet: 'E-Wallet',
+    creditCard: 'Kartu Kredit',
     investment: 'Investasi / Tabungan',
 
     // Transactions
@@ -356,6 +357,7 @@ export const translations = {
     cash: 'Cash / Physical Wallet',
     bank: 'Bank Account',
     ewallet: 'E-Wallet',
+    creditCard: 'Credit Card',
     investment: 'Investment / Savings',
 
     // Transactions
