@@ -132,6 +132,65 @@ export const triggerGoalAchievedNotification = async (
   });
 };
 
+// Low Balance Alert Helper
+export const triggerLowBalanceNotification = async (
+  walletName: string,
+  balanceFormatted: string,
+  lang: 'id' | 'en' = 'id'
+) => {
+  const title = lang === 'id'
+    ? `⚠️ Saldo Rekening Rendah (${walletName})`
+    : `⚠️ Low Balance Warning (${walletName})`;
+
+  const body = lang === 'id'
+    ? `Sisa saldo di ${walletName} tinggal ${balanceFormatted}. Segera lakukan top-up atau perhatikan pos pengeluaran Anda.`
+    : `Remaining balance in ${walletName} is now ${balanceFormatted}. Consider topping up or monitoring upcoming expenses.`;
+
+  return sendAppNotification({
+    title,
+    body,
+    tag: `low-balance-${walletName}`,
+  });
+};
+
+// Weekly Summary Notification Helper
+export const triggerWeeklySummaryNotification = async (
+  totalSpentFormatted: string,
+  topCategoryName: string,
+  lang: 'id' | 'en' = 'id'
+) => {
+  const title = lang === 'id'
+    ? '📊 Laporan Ringkasan Mingguan FinBag'
+    : '📊 FinBag Weekly Financial Summary';
+
+  const body = lang === 'id'
+    ? `Total pengeluaran minggu ini: ${totalSpentFormatted}. Pengeluaran terbesar tercatat pada kategori ${topCategoryName}.`
+    : `Total spending this week: ${totalSpentFormatted}. Your highest expenditure was in ${topCategoryName}.`;
+
+  return sendAppNotification({
+    title,
+    body,
+    tag: 'weekly-summary-alert',
+  });
+};
+
+// Transaction Reminder Helper
+export const triggerTransactionReminderNotification = async (lang: 'id' | 'en' = 'id') => {
+  const title = lang === 'id'
+    ? '📝 Sudahkah Anda Mencatat Pengeluaran Hari Ini?'
+    : '📝 Have you logged your expenses today?';
+
+  const body = lang === 'id'
+    ? 'Catat transaksi hari ini dengan cepat atau gunakan fitur Scan Struk AI untuk menjaga akurasi anggaran Anda.'
+    : 'Quickly record today’s expenses or scan receipts with AI to keep your budget accurate.';
+
+  return sendAppNotification({
+    title,
+    body,
+    tag: 'daily-tx-reminder',
+  });
+};
+
 // Test Notification Helper
 export const triggerTestNotification = async (lang: 'id' | 'en' = 'id') => {
   const title = lang === 'id'
@@ -139,8 +198,8 @@ export const triggerTestNotification = async (lang: 'id' | 'en' = 'id') => {
     : '🔔 FinBag: Notification Connected!';
 
   const body = lang === 'id'
-    ? 'Sistem notifikasi FinBag telah aktif di perangkat Anda. Anda akan menerima peringatan anggaran dan progres tabungan.'
-    : 'FinBag notification system is active on your device. You will receive budget alerts and savings milestones.';
+    ? 'Sistem notifikasi FinBag telah aktif di perangkat Anda. Anda dapat mengatur jenis notifikasi yang ingin diterima di menu Pengaturan.'
+    : 'FinBag notification system is active on your device. You can customize which notification types to receive in Settings.';
 
   return sendAppNotification({
     title,
@@ -148,3 +207,4 @@ export const triggerTestNotification = async (lang: 'id' | 'en' = 'id') => {
     tag: 'finbag-test-ping',
   });
 };
+

@@ -1,51 +1,35 @@
-# Implementasi Fitur Audit & Activity Log (Riwayat Perubahan Data)
+# Implementasi Pengaturan Kategori & Jenis Notifikasi Push (Notification Preferences)
 
 ## Ringkasan Fitur
-Fitur Audit & Activity Log dirancang untuk mencatat dan melacak setiap tindakan penambahan, pengubahan, pemindahan saldo, serta penghapusan data secara otomatis dan persisten di database cloud.
+Fitur ini memungkinkan pengguna untuk memilih secara terperinci jenis pemberitahuan push apa saja yang ingin diterima atau dinonaktifkan di perangkat mereka, serta menyinkronkan preferensi tersebut secara persisten ke akun database Cloud Firestore.
 
-### 1. Model Data & Tipe (`src/types/finance.ts`)
-- **`AuditAction`**: `'CREATE' | 'UPDATE' | 'DELETE' | 'TRANSFER' | 'CLEAR'`
-- **`AuditEntity`**: `'TRANSACTION' | 'WALLET' | 'GOAL' | 'BUDGET' | 'DATABASE' | 'SECURITY'`
-- **`AuditLogEntry`**:
-  - `id`: string unik (`log_${Date.now()}_...`)
-  - `userId`: ID pengguna
-  - `userEmail`: Email pengguna akun
-  - `timestamp`: Format ISO 8601
-  - `action`: Jenis tindakan
-  - `entity`: Modul data terkait
-  - `summary`: Ringkasan deskripsi perubahan ramah pengguna
-  - `details`: Metadata detail (nominal, nama rekening, dsb.)
+### 1. Kategori Notifikasi yang Didukung (`src/types/finance.ts`)
+- **`budgetAlerts`**: Peringatan Pagu Anggaran (saat pengeluaran mendekati 80% atau melampaui 100% dari batas pagu bulanan kategori).
+- **`goalMilestones`**: Pencapaian Target Tabungan (notifikasi perayaan saat impian tabungan tercapai 100%).
+- **`lowBalanceAlert`**: Peringatan Saldo Rekening Rendah (peringatan dini saat sisa saldo rekening/dompet menipis di bawah ambang batas minimal).
+- **`weeklySummary`**: Ringkasan & Evaluasi Mingguan (laporan berkala pengeluaran mingguan dan pos kategori terbesar).
+- **`transactionReminder`**: Pengingat Catat Transaksi Harian (pengingat otomatis untuk mencatat pengeluaran dan scan struk).
 
-### 2. Aturan Keamanan & Skema Database (`firebase-blueprint.json` & `firestore.rules`)
-- Koleksi: `/users/{userId}/audit_logs/{logId}`
-- **Immutabilitas**: Sesuai standar audit trail keamanan tinggi, log data yang sudah tercatat **hanya dapat dibaca dan dibuat** (`allow read, create: if isOwner(userId); allow update, delete: if false;`), mencegah manipulasi atau penghapusan riwayat transaksi.
-- Sudah dideploy ke Cloud Firestore melalui `deploy_firebase`.
+### 2. State & Logika Terpusat (`src/context/FinanceContext.tsx`)
+- **State `notificationPreferences`**: Disimpan di `localStorage` dan tersinkronisasi otomatis dengan dokumen profil pengguna di Firestore (`users/{userId}.notificationPreferences`).
+- **Fungsi `updateNotificationPreferences(newPrefs)`**: Menyimpan perubahan preferensi secara realtime.
+- **Fungsi `triggerCategoryNotificationTest(category)`**: Menguji coba pengiriman notifikasi spesifik untuk masing-masing kategori secara terpisah.
+- **Kondisi Pemicu Otomatis**:
+  - `addTransaction`: Pengecekan pagu anggaran hanya dijalankan jika `budgetAlerts === true`.
+  - `addTransaction`: Pengecekan saldo menipis dijalankan jika `lowBalanceAlert === true`.
+  - `contributeToGoal`: Pengecekan target tabungan tercapai hanya dijalankan jika `goalMilestones === true`.
 
-### 3. Logika & Pemicu Mutasi Terpusat (`src/context/FinanceContext.tsx`)
-- Fungsi `logActivity()` terpasang otomatis pada setiap fungsi mutasi:
-  - `addTransaction`: Pemasukan, Pengeluaran, atau Transfer antar-dompet
-  - `updateTransaction`: Perubahan nominal / kategori / dompet
-  - `deleteTransaction`: Penghapusan transaksi
-  - `addWallet`: Penambahan rekening baru
-  - `updateWallet`: Pengubahan saldo / nama rekening
-  - `deleteWallet`: Penutupan rekening
-  - `updateBudgetLimit`: Penyesuaian pagu anggaran bulanan
-  - `addGoal`: Pembuatan target tabungan
-  - `contributeToGoal`: Penyetoran tabungan
-  - `clearAllDatabaseData`: Pengosongan database
-- Menyediakan *live listener* (`onSnapshot`) untuk sinkronisasi otomatis secara realtime antar-perangkat.
+### 3. Tampilan Antarmuka Pengguna (`src/components/views/SettingsView.tsx`)
+- Terdapat sub-panel khusus "Jenis & Kategori Notifikasi" di dalam Bagian Notifikasi Push.
+- Setiap kategori dilengkapi:
+  - Ikon visual berwarna representatif.
+  - Judul dan deskripsi fungsi yang jelas.
+  - Tombol **Uji** individual untuk langsung mencoba tampilan notifikasi di perangkat.
+  - **Toggle Switch** interaktif dengan animasi transisi yang mulus.
+  - Pesan peringatan jika izin notifikasi sistem browser belum diizinkan.
 
-### 4. Tampilan Antarmuka Pengguna (UI)
-- **Menu Pengaturan (`src/components/views/SettingsView.tsx`)**:
-  - Kartu khusus "Log Riwayat Perubahan Data" dengan counter badge.
-  - Filter aksi interaktif: *Semua*, *Dibuat*, *Diubah*, *Dihapus*, *Transfer*, *Dikosongkan*.
-  - Indikator warna badge (Hijau: CREATE, Biru: UPDATE, Merah: DELETE, Ungu: TRANSFER, Amber: CLEAR).
-  - Waktu lengkap (tanggal, jam, menit, detik).
-- **Konsol Admin (`src/components/views/AdminView.tsx`)**:
-  - Kartu inspeksi riwayat audit sistem berlabel *Immutable Trail*.
-
-### 5. Verifikasi & Pengujian
-- `compile_applet`: Berhasil tanpa error.
-- `lint_applet`: 0 error linting TypeScript.
-- `npm test`: 15/15 unit test berhasil lolos.
-- Server lokal: HTTP 200 OK.
+### 4. Hasil Pengujian & Verifikasi
+- Kompilasi `compile_applet`: **Berhasil (0 error)**.
+- Linting TypeScript `lint_applet`: **0 error**.
+- Unit Test `npm test`: **15/15 Lolos**.
+- Dev Server: **HTTP 200 OK**.

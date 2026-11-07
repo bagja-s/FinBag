@@ -9,7 +9,9 @@ import {
   UserProfile,
   AuditAction,
   AuditEntity,
-  AuditLogEntry
+  AuditLogEntry,
+  NotificationPreferences,
+  DEFAULT_NOTIFICATION_PREFERENCES
 } from '../types/finance';
 import { 
   INITIAL_WALLETS, 
@@ -49,6 +51,9 @@ import {
   triggerBudgetAlertNotification, 
   triggerGoalAchievedNotification, 
   triggerTestNotification, 
+  triggerLowBalanceNotification,
+  triggerWeeklySummaryNotification,
+  triggerTransactionReminderNotification,
   NotificationPermissionStatus 
 } from '../services/notificationService';
 import { formatCurrency } from '../utils/financeCalculations';
@@ -75,6 +80,9 @@ interface FinanceContextType {
   notificationPermission: NotificationPermissionStatus;
   requestNotifications: () => Promise<NotificationPermissionStatus>;
   sendTestNotification: () => Promise<boolean>;
+  notificationPreferences: NotificationPreferences;
+  updateNotificationPreferences: (prefs: Partial<NotificationPreferences>) => Promise<void>;
+  triggerCategoryNotificationTest: (category: keyof NotificationPreferences) => Promise<boolean>;
 
   // Preferences
   language: SupportedLanguage;
@@ -175,14 +183,78 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     return getNotificationPermission();
   });
 
+  // Notification Preferences state
+  const [notificationPreferences, setNotificationPreferences] = useState<NotificationPreferences>(() => {
+    const saved = localStorage.getItem(`${LOCAL_STORAGE_PREFIX}notification_prefs`);
+    if (saved) {
+      try {
+        return { ...DEFAULT_NOTIFICATION_PREFERENCES, ...JSON.parse(saved) };
+      } catch {
+        return DEFAULT_NOTIFICATION_PREFERENCES;
+      }
+    }
+    return DEFAULT_NOTIFICATION_PREFERENCES;
+  });
+
   const requestNotifications = async (): Promise<NotificationPermissionStatus> => {
     const perm = await requestNotificationPermission();
     setNotificationPermission(perm);
     return perm;
   };
 
+  const updateNotificationPreferences = async (newPrefs: Partial<NotificationPreferences>) => {
+    const updated: NotificationPreferences = { ...notificationPreferences, ...newPrefs };
+    setNotificationPreferences(updated);
+    localStorage.setItem(`${LOCAL_STORAGE_PREFIX}notification_prefs`, JSON.stringify(updated));
+
+    if (user) {
+      const userDocRef = doc(db, 'users', user.uid);
+      try {
+        await setDoc(userDocRef, { notificationPreferences: updated }, { merge: true });
+      } catch (err) {
+        console.warn('Failed to save notification preferences to Firestore:', err);
+      }
+    }
+  };
+
   const sendTestNotification = async (): Promise<boolean> => {
     return triggerTestNotification(language);
+  };
+
+  const triggerCategoryNotificationTest = async (category: keyof NotificationPreferences): Promise<boolean> => {
+    if (category === 'budgetAlerts') {
+      return triggerBudgetAlertNotification(
+        language === 'id' ? 'Makanan & Minuman' : 'Food & Dining',
+        85,
+        formatCurrency(850000, baseCurrency),
+        formatCurrency(1000000, baseCurrency),
+        language
+      );
+    } else if (category === 'goalMilestones') {
+      return triggerGoalAchievedNotification(
+        language === 'id' ? 'Dana Darurat' : 'Emergency Fund',
+        formatCurrency(10000000, baseCurrency),
+        language
+      );
+    } else if (category === 'lowBalanceAlert') {
+      const sampleWallet = wallets[0]?.name || (language === 'id' ? 'Dompet Utama' : 'Main Wallet');
+      const sampleAmount = baseCurrency === 'IDR' ? 45000 : 4.5;
+      return triggerLowBalanceNotification(
+        sampleWallet,
+        formatCurrency(sampleAmount, baseCurrency),
+        language
+      );
+    } else if (category === 'weeklySummary') {
+      const sampleSpent = baseCurrency === 'IDR' ? 1250000 : 125;
+      return triggerWeeklySummaryNotification(
+        formatCurrency(sampleSpent, baseCurrency),
+        language === 'id' ? 'Belanja Kebutuhan' : 'Groceries',
+        language
+      );
+    } else if (category === 'transactionReminder') {
+      return triggerTransactionReminderNotification(language);
+    }
+    return sendTestNotification();
   };
 
   const ADMIN_EMAILS = ['sm.bagja@gmail.com'];
@@ -413,6 +485,13 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
         if (docSnap.exists()) {
           const profileData = docSnap.data() as UserProfile;
           setCurrentUserProfile(profileData);
+          if (profileData.notificationPreferences) {
+            setNotificationPreferences(profileData.notificationPreferences);
+            localStorage.setItem(
+              `${LOCAL_STORAGE_PREFIX}notification_prefs`,
+              JSON.stringify(profileData.notificationPreferences)
+            );
+          }
         } else {
           // Initialize fresh user profile
           const newProfile: UserProfile = {
@@ -426,6 +505,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
             lastLoginAt: nowIso,
             baseCurrency,
             language,
+            notificationPreferences,
           };
           setDoc(userDocRef, cleanFirestoreData(newProfile), { merge: true }).catch(console.warn);
           setCurrentUserProfile(newProfile);
@@ -695,8 +775,8 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
 
     setTransactions((prev) => [newTx, ...prev]);
 
-    // Push Notification trigger: check budget limits on expense transactions
-    if (newTx.type === 'expense' && newTx.categoryId) {
+    // Push Notification trigger: check budget limits on expense transactions if enabled
+    if (notificationPreferences.budgetAlerts && newTx.type === 'expense' && newTx.categoryId) {
       const category = categories.find((c) => c.id === newTx.categoryId);
       if (category && category.monthlyLimit > 0) {
         const currentMonthStr = newTx.date.substring(0, 7);
@@ -714,6 +794,23 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
             percentage,
             formatCurrency(totalSpent, baseCurrency),
             formatCurrency(limitInBase, baseCurrency),
+            language
+          ).catch(console.warn);
+        }
+      }
+    }
+
+    // Push Notification trigger: check low balance warning on source wallet if enabled
+    if (notificationPreferences.lowBalanceAlert && newTx.sourceWalletId && newTx.type !== 'income') {
+      const sourceW = wallets.find((w) => w.id === newTx.sourceWalletId);
+      if (sourceW) {
+        const remaining = sourceW.balance - newTx.amount;
+        const remainingInBase = convertCurrency(remaining, sourceW.currency, baseCurrency, exchangeRates.rates);
+        const lowThresholdInBase = baseCurrency === 'IDR' ? 50000 : 5;
+        if (remainingInBase <= lowThresholdInBase && remaining >= 0) {
+          triggerLowBalanceNotification(
+            sourceW.name,
+            formatCurrency(remaining, sourceW.currency),
             language
           ).catch(console.warn);
         }
@@ -1041,8 +1138,8 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     };
     setGoals((prev) => prev.map((g) => (g.id === goalId ? updatedGoal : g)));
 
-    // Push notification trigger: check if goal target is achieved
-    if (updatedGoal.currentAmount >= updatedGoal.targetAmount && goal.currentAmount < goal.targetAmount) {
+    // Push notification trigger: check if goal target is achieved if enabled
+    if (notificationPreferences.goalMilestones && updatedGoal.currentAmount >= updatedGoal.targetAmount && goal.currentAmount < goal.targetAmount) {
       triggerGoalAchievedNotification(
         goal.title,
         formatCurrency(updatedGoal.targetAmount, updatedGoal.currency),
@@ -1198,6 +1295,9 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
         notificationPermission,
         requestNotifications,
         sendTestNotification,
+        notificationPreferences,
+        updateNotificationPreferences,
+        triggerCategoryNotificationTest,
         loginWithGoogle,
         logout,
         announcementNotice,

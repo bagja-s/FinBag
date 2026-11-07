@@ -19,10 +19,16 @@ import {
   HelpCircle,
   Info,
   History,
-  FileText
+  FileText,
+  PieChart,
+  Target,
+  Wallet,
+  Clock,
+  Calendar,
+  Send
 } from 'lucide-react';
 import { ConfirmationModal } from '../common/ConfirmationModal';
-import { SupportedCurrency, AuditAction } from '../../types/finance';
+import { SupportedCurrency, AuditAction, NotificationPreferences } from '../../types/finance';
 import { CURRENCY_METADATA } from '../../services/currencyService';
 
 export const SettingsView: React.FC = () => {
@@ -38,6 +44,9 @@ export const SettingsView: React.FC = () => {
     notificationPermission,
     requestNotifications,
     sendTestNotification,
+    notificationPreferences,
+    updateNotificationPreferences,
+    triggerCategoryNotificationTest,
     language,
     setLanguage,
     theme,
@@ -55,6 +64,9 @@ export const SettingsView: React.FC = () => {
   const [isRequestingNotification, setIsRequestingNotification] = useState(false);
   const [isSendingTestNotification, setIsSendingTestNotification] = useState(false);
   const [testNotificationSentMsg, setTestNotificationSentMsg] = useState(false);
+  const [testingCategory, setTestingCategory] = useState<keyof NotificationPreferences | null>(null);
+  const [categoryTestSuccessMsg, setCategoryTestSuccessMsg] = useState<string | null>(null);
+  const [prefSuccessMsg, setPrefSuccessMsg] = useState(false);
 
   // PIN settings state
   const [newPinInput, setNewPinInput] = useState('');
@@ -377,6 +389,143 @@ export const SettingsView: React.FC = () => {
             <span>{t.testNotificationSent}</span>
           </p>
         )}
+
+        {/* Notification Categories & Preferences Sub-card */}
+        <div className="mt-5 pt-4 border-t border-slate-100 dark:border-slate-800">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h3 className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                <span>{t.notificationCategoriesTitle}</span>
+              </h3>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                {t.notificationCategoriesDesc}
+              </p>
+            </div>
+            {prefSuccessMsg && (
+              <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                <span>{t.notificationPreferencesSaved}</span>
+              </span>
+            )}
+          </div>
+
+          {notificationPermission !== 'granted' && (
+            <div className="mb-3.5 p-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/40 text-[11px] text-amber-800 dark:text-amber-300 flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500" />
+              <span>{t.notificationPermissionRequired}</span>
+            </div>
+          )}
+
+          <div className="space-y-2.5">
+            {[
+              {
+                id: 'budgetAlerts' as keyof NotificationPreferences,
+                title: t.notifyBudgetAlerts,
+                desc: t.notifyBudgetAlertsDesc,
+                icon: <PieChart className="h-4 w-4 text-amber-500" />,
+                enabled: notificationPreferences.budgetAlerts,
+              },
+              {
+                id: 'goalMilestones' as keyof NotificationPreferences,
+                title: t.notifyGoalMilestones,
+                desc: t.notifyGoalMilestonesDesc,
+                icon: <Target className="h-4 w-4 text-emerald-500" />,
+                enabled: notificationPreferences.goalMilestones,
+              },
+              {
+                id: 'lowBalanceAlert' as keyof NotificationPreferences,
+                title: t.notifyLowBalance,
+                desc: t.notifyLowBalanceDesc,
+                icon: <Wallet className="h-4 w-4 text-rose-500" />,
+                enabled: notificationPreferences.lowBalanceAlert,
+              },
+              {
+                id: 'weeklySummary' as keyof NotificationPreferences,
+                title: t.notifyWeeklySummary,
+                desc: t.notifyWeeklySummaryDesc,
+                icon: <Calendar className="h-4 w-4 text-blue-500" />,
+                enabled: notificationPreferences.weeklySummary,
+              },
+              {
+                id: 'transactionReminder' as keyof NotificationPreferences,
+                title: t.notifyTransactionReminder,
+                desc: t.notifyTransactionReminderDesc,
+                icon: <Clock className="h-4 w-4 text-purple-500" />,
+                enabled: notificationPreferences.transactionReminder,
+              },
+            ].map((cat) => (
+              <div
+                key={cat.id}
+                className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl border border-slate-100 dark:border-slate-800/80 bg-slate-50/60 dark:bg-slate-800/40 hover:bg-slate-100/50 dark:hover:bg-slate-800/60 transition-colors gap-3"
+              >
+                <div className="flex items-start gap-3 min-w-0">
+                  <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white dark:bg-slate-700 shadow-xs border border-slate-200/60 dark:border-slate-600">
+                    {cat.icon}
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                      {cat.title}
+                    </h4>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-relaxed">
+                      {cat.desc}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setTestingCategory(cat.id);
+                      const ok = await triggerCategoryNotificationTest(cat.id);
+                      setTestingCategory(null);
+                      if (ok) {
+                        setCategoryTestSuccessMsg(`${cat.title}: Notifikasi uji terkirim`);
+                        setTimeout(() => setCategoryTestSuccessMsg(null), 3000);
+                      }
+                    }}
+                    disabled={testingCategory === cat.id || notificationPermission !== 'granted'}
+                    title={t.testNotificationCategory}
+                    className="flex items-center gap-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 py-1 text-[10px] font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors disabled:opacity-40 cursor-pointer"
+                  >
+                    <Send className="h-2.5 w-2.5 text-blue-500" />
+                    <span>{testingCategory === cat.id ? 'Menguji...' : 'Uji'}</span>
+                  </button>
+
+                  {/* Toggle switch button */}
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={cat.enabled}
+                    onClick={async () => {
+                      const updated = !cat.enabled;
+                      await updateNotificationPreferences({ [cat.id]: updated });
+                      setPrefSuccessMsg(true);
+                      setTimeout(() => setPrefSuccessMsg(false), 2500);
+                    }}
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      cat.enabled ? 'bg-blue-600' : 'bg-slate-300 dark:bg-slate-700'
+                    }`}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                        cat.enabled ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {categoryTestSuccessMsg && (
+            <p className="mt-2.5 text-xs font-semibold text-emerald-500 flex items-center gap-1.5">
+              <CheckCircle2 className="h-3.5 w-3.5" />
+              <span>{categoryTestSuccessMsg}</span>
+            </p>
+          )}
+        </div>
       </div>
 
       {/* 4. Data Management */}

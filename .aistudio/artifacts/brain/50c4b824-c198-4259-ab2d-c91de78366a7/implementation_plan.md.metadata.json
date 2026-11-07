@@ -1,6 +1,6 @@
 {
-  "summary": "Dokumentasi implementasi fitur Audit & Activity Log (Pencatatan Riwayat Perubahan Data) pada FinBag. Mencakup penambahan tipe data audit di src/types/finance.ts, skema blueprint dan aturan keamanan Firestore (immutable trail), orkestrasi pencatatan otomatis di FinanceContext pada seluruh mutasi data, serta tampilan UI riwayat log di Pengaturan (SettingsView) dan Konsol Admin (AdminView).",
-  "updatedAt": "2026-11-07T01:25:47.768785847Z",
-  "requestFeedback": true,
-  "userFacing": true
+  "summary":  "Dokumentasi implementasi fitur Pengaturan Kategori & Jenis Notifikasi Push (Notification Preferences) pada FinBag. Mencakup state notificationPreferences di FinanceContext, integrasi penyesuaian pemicu notifikasi pada mutasi transaksi dan target tabungan, sinkronisasi cloud ke Firestore user profile, serta komponen toggle switch dan tombol uji coba tiap kategori notifikasi di SettingsView.",
+  "updatedAt":  "2026-11-07T20:52:20.280942397Z",
+  "requestFeedback":  true,
+  "userFacing":  true
 }

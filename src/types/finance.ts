@@ -82,6 +82,7 @@ export interface UserProfile {
   lastLoginAt: string;
   baseCurrency?: SupportedCurrency;
   language?: SupportedLanguage;
+  notificationPreferences?: NotificationPreferences;
 }
 
 export type AuditAction = 'CREATE' | 'UPDATE' | 'DELETE' | 'TRANSFER' | 'CLEAR';
@@ -98,3 +99,18 @@ export interface AuditLogEntry {
   details?: Record<string, any>;
 }
 
+export interface NotificationPreferences {
+  budgetAlerts: boolean;
+  goalMilestones: boolean;
+  lowBalanceAlert: boolean;
+  weeklySummary: boolean;
+  transactionReminder: boolean;
+}
+
+export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
+  budgetAlerts: true,
+  goalMilestones: true,
+  lowBalanceAlert: true,
+  weeklySummary: true,
+  transactionReminder: false,
+};
