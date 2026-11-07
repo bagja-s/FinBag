@@ -114,6 +114,15 @@ interface FinanceContextType {
   setEditingTransaction: (tx: Transaction | null) => void;
   openEditTransaction: (tx: Transaction) => void;
 
+  // Wallet Detail & Mutations Modal
+  selectedWalletDetail: WalletAccount | null;
+  setSelectedWalletDetail: (w: WalletAccount | null) => void;
+  openWalletDetail: (w: WalletAccount) => void;
+  closeWalletDetail: () => void;
+  preselectedWalletId: string | null;
+  setPreselectedWalletId: (id: string | null) => void;
+  openAddTransactionWithWallet: (walletId: string, defaultType?: 'expense' | 'income' | 'transfer') => void;
+
   // Onboarding Tutorial
   isOnboardingOpen: boolean;
   setIsOnboardingOpen: (open: boolean) => void;
@@ -317,6 +326,24 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     setIsOnboardingOpen(true);
   };
 
+  // Wallet Detail & Mutations Modal
+  const [selectedWalletDetail, setSelectedWalletDetail] = useState<WalletAccount | null>(null);
+  const [preselectedWalletId, setPreselectedWalletId] = useState<string | null>(null);
+
+  const openWalletDetail = (wallet: WalletAccount) => {
+    setSelectedWalletDetail(wallet);
+  };
+
+  const closeWalletDetail = () => {
+    setSelectedWalletDetail(null);
+  };
+
+  const openAddTransactionWithWallet = (walletId: string, defaultType: 'expense' | 'income' | 'transfer' = 'expense') => {
+    setEditingTransaction(null);
+    setPreselectedWalletId(walletId);
+    setIsTransactionModalOpen(true);
+  };
+
   // Financial Data - strictly empty initial state directly loaded from user database
   const [wallets, setWallets] = useState<WalletAccount[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -333,6 +360,18 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     localStorage.removeItem(`${LOCAL_STORAGE_PREFIX}transactions`);
     localStorage.removeItem(`${LOCAL_STORAGE_PREFIX}goals`);
   }, []);
+
+  // Keep selectedWalletDetail in sync with latest wallets updates
+  useEffect(() => {
+    if (selectedWalletDetail) {
+      const refreshed = wallets.find((w) => w.id === selectedWalletDetail.id);
+      if (refreshed) {
+        setSelectedWalletDetail(refreshed);
+      } else {
+        setSelectedWalletDetail(null);
+      }
+    }
+  }, [wallets]);
 
   // FX Rates
   const [exchangeRates, setExchangeRates] = useState<RatesData>({
@@ -803,6 +842,27 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
       createdAt: new Date().toISOString(),
     };
 
+    // Validation: prevent expense or outgoing transfer if wallet balance is 0, negative, or insufficient
+    if (newTx.type === 'expense' || newTx.type === 'transfer') {
+      const sourceW = wallets.find((w) => w.id === newTx.sourceWalletId);
+      if (sourceW) {
+        if (sourceW.balance <= 0) {
+          throw new Error(
+            language === 'id'
+              ? `Saldo dompet "${sourceW.name}" kosong atau kurang (${formatCurrency(sourceW.balance, sourceW.currency)}). Pengeluaran tidak dapat dilakukan dari dompet ini.`
+              : `Wallet "${sourceW.name}" has zero or negative balance (${formatCurrency(sourceW.balance, sourceW.currency)}). Cannot make expenses.`
+          );
+        }
+        if (newTx.amount > sourceW.balance) {
+          throw new Error(
+            language === 'id'
+              ? `Nominal transaksi (${formatCurrency(newTx.amount, newTx.currency)}) melebihi sisa saldo dompet "${sourceW.name}" (${formatCurrency(sourceW.balance, sourceW.currency)}).`
+              : `Transaction amount exceeds remaining balance in "${sourceW.name}".`
+          );
+        }
+      }
+    }
+
     // Update balances of associated wallets
     let updatedWalletsList: WalletAccount[] = [];
     setWallets((prevWallets) => {
@@ -921,6 +981,34 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
       userId: user?.uid,
       createdAt: oldTx.createdAt || new Date().toISOString(),
     };
+
+    // Validation: prevent expense or outgoing transfer if wallet balance after rollback is 0, negative, or insufficient
+    if (updatedTx.type === 'expense' || updatedTx.type === 'transfer') {
+      const sourceW = wallets.find((w) => w.id === updatedTx.sourceWalletId);
+      if (sourceW) {
+        let availableBalance = sourceW.balance;
+        if (oldTx.type === 'expense' && oldTx.sourceWalletId === sourceW.id) {
+          availableBalance += oldTx.amount;
+        } else if (oldTx.type === 'transfer' && oldTx.sourceWalletId === sourceW.id) {
+          availableBalance += oldTx.amount;
+        }
+
+        if (availableBalance <= 0) {
+          throw new Error(
+            language === 'id'
+              ? `Saldo dompet "${sourceW.name}" kosong atau kurang. Pengeluaran tidak dapat dilakukan dari dompet ini.`
+              : `Wallet "${sourceW.name}" has zero or negative balance.`
+          );
+        }
+        if (updatedTx.amount > availableBalance) {
+          throw new Error(
+            language === 'id'
+              ? `Nominal transaksi melebihi sisa saldo dompet "${sourceW.name}".`
+              : `Transaction amount exceeds available balance in "${sourceW.name}".`
+          );
+        }
+      }
+    }
 
     // Recalculate wallet balances: rollback oldTx and apply updatedTx
     let updatedWalletsList: WalletAccount[] = [];
@@ -1440,6 +1528,13 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
         isOnboardingOpen,
         setIsOnboardingOpen,
         openTutorial,
+        selectedWalletDetail,
+        setSelectedWalletDetail,
+        openWalletDetail,
+        closeWalletDetail,
+        preselectedWalletId,
+        setPreselectedWalletId,
+        openAddTransactionWithWallet,
         wallets,
         transactions,
         categories,

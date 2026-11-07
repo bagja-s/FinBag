@@ -36,6 +36,7 @@ export const DashboardView: React.FC = () => {
     setActiveTab, 
     setIsTransactionModalOpen, 
     setIsAddWalletModalOpen, 
+    openWalletDetail,
     openEditTransaction,
     deleteTransaction,
     language 
@@ -146,7 +147,7 @@ export const DashboardView: React.FC = () => {
             {wallets.map((wallet) => (
               <div
                 key={wallet.id}
-                onClick={() => setActiveTab('wallets')}
+                onClick={() => openWalletDetail(wallet)}
                 className="min-w-[200px] sm:min-w-[230px] rounded-2xl border border-slate-200 bg-white p-4 shadow-sm hover:shadow-md hover:-translate-y-1 active:scale-[0.98] dark:border-slate-800 dark:bg-slate-900 transition-all duration-200 ease-out cursor-pointer snap-start"
               >
                 <div className="flex items-center justify-between mb-2">

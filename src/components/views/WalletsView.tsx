@@ -26,6 +26,7 @@ export const WalletsView: React.FC = () => {
     exchangeRates, 
     openAddWallet,
     openEditWallet,
+    openWalletDetail,
     deleteWallet,
     setIsTransactionModalOpen, 
     language 
@@ -128,7 +129,8 @@ export const WalletsView: React.FC = () => {
                 key={wallet.id}
                 variants={cardItemVariants}
                 whileHover={{ y: -3 }}
-                className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 transition-all duration-200 ease-out hover:shadow-md hover:border-blue-500/50"
+                onClick={() => openWalletDetail(wallet)}
+                className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 transition-all duration-200 ease-out hover:shadow-md hover:border-blue-500/50 cursor-pointer"
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-3 min-w-0">
@@ -191,14 +193,16 @@ export const WalletsView: React.FC = () => {
                   )}
                 </div>
 
-                {wallet.accountNumber && (
-                  <div className="mt-4 border-t border-slate-100 dark:border-slate-800 pt-3 flex items-center justify-between text-[11px] text-slate-500">
-                    <span>{language === 'id' ? 'Nomor Akun:' : 'Account No:'}</span>
-                    <span className="font-mono font-medium text-slate-700 dark:text-slate-300">
+                <div className="mt-4 border-t border-slate-100 dark:border-slate-800 pt-3 flex items-center justify-between text-[11px]">
+                  <span className="text-blue-600 dark:text-blue-400 font-semibold group-hover:underline">
+                    {language === 'id' ? 'Lihat Mutasi & Detail →' : 'View Mutations & Details →'}
+                  </span>
+                  {wallet.accountNumber && (
+                    <span className="font-mono text-slate-400">
                       {wallet.accountNumber}
                     </span>
-                  </div>
-                )}
+                  )}
+                </div>
               </motion.div>
             );
           })}

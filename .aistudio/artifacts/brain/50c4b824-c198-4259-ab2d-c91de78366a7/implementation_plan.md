@@ -40,7 +40,31 @@ Fitur ini memungkinkan pengguna untuk memilih secara terperinci jenis pemberitah
      - Menyediakan opsi "Kartu Kredit" (Credit Card) di `AddWalletModal.tsx` dengan ikon visual `CreditCard` di `WalletsView.tsx` dan `DashboardView.tsx`.
      - Menambahkan translasi multi-bahasa (ID: "Kartu Kredit", EN: "Credit Card").
 
-### 5. Hasil Pengujian & Verifikasi
+### 5. Fitur Modal Detail & Mutasi Dompet (Wallet Detail & Mutations)
+- **Komponen `WalletDetailModal.tsx`**:
+  - Muncul saat pengguna mengklik kartu dompet di tab **Dompet** maupun ringkasan dompet di tab **Dashboard**.
+  - **Informasi Akun**: Nama dompet, tipe (Bank, Cash, E-Wallet, Kartu Kredit, Investasi), nomor rekening, dan badge mata uang.
+  - **Status & Saldo Realtime**: Saldo dompet dalam mata uang asal dan ekuivalen mata uang utama, dilengkapi status visual (Aktif, Saldo Kosong, atau Saldo Negatif).
+  - **Statistik Khusus Dompet**: Menampilkan akumulasi Total Dana Masuk (pemasukan & transfer masuk), Total Dana Keluar (pengeluaran & transfer keluar), serta jumlah riwayat mutasi.
+  - **Daftar Mutasi Interaktif**:
+    - Filter tab: Semua Mutasi, Masuk, Keluar, dan Transfer.
+    - Kolom pencarian mutasi secara realtime berdasarkan deskripsi atau kategori.
+    - Rincian mutasi dengan tanggal, kategori/arah transfer (`Dari [Dompet]` atau `Ke [Dompet]`), nominal (`+Rp` hijau atau `-Rp` merah), dan tombol edit cepat transaksi.
+  - **Aksi Cepat**: Tombol "Catat Transaksi untuk Dompet Ini" (otomatis memilih dompet ini di modal transaksi), "Ubah Dompet", dan "Tutup".
+
+### 6. Validasi Saldo Kosong atau Kurang (≤ 0) pada Pengeluaran
+- **Logika Pencegahan**:
+  - Jika saldo dompet sumber ≤ 0 atau nominal transaksi melebihi sisa saldo dompet, sistem **memblokir** pembuatan transaksi pengeluaran (`expense`) dan transfer keluar (`transfer`).
+  - **Pada Tampilan Formulir (`TransactionModal.tsx`)**:
+    - Menampilkan informasi sisa saldo langsung di samping label "Dompet Asal".
+    - Pada pilihan dropdown, dompet yang bersaldo kosong/minus diberi tanda keterangan `[Kosong/Minus]`.
+    - Menampilkan banner peringatan berwarna merah jika dompet yang dipilih bersaldo ≤ 0.
+    - Tombol simpan transaksi otomatis di-disable (dinonaktifkan) saat dompet bersaldo kosong dipilih untuk transaksi pengeluaran/transfer.
+    - Menolak submit form dan menampilkan pesan error informatif jika nominal melebihi sisa saldo.
+  - **Pada Level State & Mutasi (`FinanceContext.tsx`)**:
+    - `addTransaction` dan `updateTransaction` memverifikasi saldo dompet sumber sebelum mengeksekusi mutasi. Jika saldo ≤ 0 atau `amount > balance`, mutasi ditolak dengan exception pesan yang jelas.
+
+### 7. Hasil Pengujian & Verifikasi
 - Kompilasi `compile_applet`: **Berhasil (0 error)**.
 - Linting TypeScript `lint_applet`: **0 error**.
 - Unit Test `npm test`: **15/15 Lolos**.

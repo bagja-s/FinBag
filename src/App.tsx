@@ -19,6 +19,7 @@ import { AdminView } from './components/views/AdminView';
 import { LoginView } from './components/views/LoginView';
 import { TransactionModal } from './components/modals/TransactionModal';
 import { AddWalletModal } from './components/modals/AddWalletModal';
+import { WalletDetailModal } from './components/modals/WalletDetailModal';
 import { PinLockModal } from './components/modals/PinLockModal';
 import { OnboardingTutorialModal } from './components/onboarding/OnboardingTutorialModal';
 import { useOnlineStatus } from './hooks/useOnlineStatus';
@@ -155,6 +156,7 @@ const MainLayout: React.FC = () => {
       {/* Interactive Global Modals */}
       <TransactionModal />
       <AddWalletModal />
+      <WalletDetailModal />
       <OnboardingTutorialModal />
     </div>
   );

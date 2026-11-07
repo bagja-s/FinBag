@@ -19,7 +19,8 @@ import {
   Edit3,
   Camera,
   Loader2,
-  CheckCircle2
+  CheckCircle2,
+  AlertCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { modalSpringVariants, backdropVariants } from '../../utils/motionVariants';
@@ -30,6 +31,8 @@ export const TransactionModal: React.FC = () => {
     setIsTransactionModalOpen, 
     editingTransaction,
     setEditingTransaction,
+    preselectedWalletId,
+    setPreselectedWalletId,
     wallets, 
     categories, 
     addTransaction, 
@@ -85,11 +88,15 @@ export const TransactionModal: React.FC = () => {
       setErrorMsg('');
       setScanSuccessMessage(null);
     } else {
-      setType('expense');
+      const defaultWallet = preselectedWalletId 
+        ? (wallets.find(w => w.id === preselectedWalletId) || wallets[0])
+        : wallets[0];
+      const defaultType: TransactionType = (defaultWallet && defaultWallet.balance <= 0) ? 'income' : 'expense';
+      setType(defaultType);
       setAmountStr('');
-      setCurrency(baseCurrency);
-      setSourceWalletId(wallets[0]?.id || '');
-      setTargetWalletId(wallets[1]?.id || '');
+      setCurrency(defaultWallet?.currency || baseCurrency);
+      setSourceWalletId(defaultWallet?.id || '');
+      setTargetWalletId(wallets.find(w => w.id !== defaultWallet?.id)?.id || (wallets[1]?.id || ''));
       setCategoryId(categories[0]?.id || 'food');
       setDate(new Date().toISOString().split('T')[0]);
       setDescription('');
@@ -99,7 +106,7 @@ export const TransactionModal: React.FC = () => {
       setErrorMsg('');
       setScanSuccessMessage(null);
     }
-  }, [isTransactionModalOpen, editingTransaction, baseCurrency, wallets, categories]);
+  }, [isTransactionModalOpen, editingTransaction, preselectedWalletId, baseCurrency, wallets, categories]);
 
   const quickAmounts = currency === 'IDR'
     ? [20000, 50000, 100000, 250000, 500000, 1000000]
@@ -108,6 +115,7 @@ export const TransactionModal: React.FC = () => {
   const handleClose = () => {
     setIsTransactionModalOpen(false);
     setEditingTransaction(null);
+    setPreselectedWalletId(null);
     setShowConfirmModal(false);
     setErrorMsg('');
     setScanSuccessMessage(null);
@@ -228,6 +236,36 @@ export const TransactionModal: React.FC = () => {
     if (type === 'transfer' && sourceWalletId === targetWalletId) {
       setErrorMsg('Dompet asal dan tujuan tidak boleh sama.');
       return;
+    }
+
+    // Strict validation: prevent expenses and outgoing transfers if wallet balance is <= 0 or insufficient
+    if ((type === 'expense' || type === 'transfer') && sourceWalletObj) {
+      let availableBalance = sourceWalletObj.balance;
+      if (isEditMode && editingTransaction) {
+        if (editingTransaction.type === 'expense' && editingTransaction.sourceWalletId === sourceWalletObj.id) {
+          availableBalance += editingTransaction.amount;
+        } else if (editingTransaction.type === 'transfer' && editingTransaction.sourceWalletId === sourceWalletObj.id) {
+          availableBalance += editingTransaction.amount;
+        }
+      }
+
+      if (availableBalance <= 0) {
+        setErrorMsg(
+          language === 'id'
+            ? `Saldo dompet "${sourceWalletObj.name}" kosong atau kurang (${formatCurrency(sourceWalletObj.balance, sourceWalletObj.currency)}). Pengeluaran tidak dapat dilakukan dari dompet ini.`
+            : `Wallet "${sourceWalletObj.name}" has zero or negative balance (${formatCurrency(sourceWalletObj.balance, sourceWalletObj.currency)}). Cannot make expenses from this wallet.`
+        );
+        return;
+      }
+
+      if (parsedAmount > availableBalance) {
+        setErrorMsg(
+          language === 'id'
+            ? `Nominal transaksi (${formatCurrency(parsedAmount, currency)}) melebihi sisa saldo dompet "${sourceWalletObj.name}" (${formatCurrency(availableBalance, sourceWalletObj.currency)}).`
+            : `Transaction amount exceeds remaining balance in "${sourceWalletObj.name}".`
+        );
+        return;
+      }
     }
 
     setErrorMsg('');
@@ -536,9 +574,19 @@ export const TransactionModal: React.FC = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {/* Source Wallet */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  {t.fromWallet}
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                    {t.fromWallet}
+                  </label>
+                  {sourceWalletObj && (
+                    <span className={`text-[11px] font-mono font-bold tabular-nums ${
+                      sourceWalletObj.balance <= 0 ? 'text-rose-500' : 'text-slate-500 dark:text-slate-400'
+                    }`}>
+                      {language === 'id' ? 'Saldo: ' : 'Bal: '}
+                      {formatCurrency(sourceWalletObj.balance, sourceWalletObj.currency)}
+                    </span>
+                  )}
+                </div>
                 <div className="flex items-center rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-800/80">
                   <Wallet className="h-4 w-4 text-slate-400 mr-2 shrink-0" />
                   <select
@@ -548,11 +596,23 @@ export const TransactionModal: React.FC = () => {
                   >
                     {wallets.map((w) => (
                       <option key={w.id} value={w.id} className="dark:bg-slate-900">
-                        {w.name} ({w.currency})
+                        {w.name} ({w.currency}) · Saldo: {formatCurrency(w.balance, w.currency)} {w.balance <= 0 ? (language === 'id' ? '[Kosong/Minus]' : '[Empty]') : ''}
                       </option>
                     ))}
                   </select>
                 </div>
+
+                {/* Warning notice if balance is <= 0 for expense or transfer */}
+                {(type === 'expense' || type === 'transfer') && sourceWalletObj && sourceWalletObj.balance <= 0 && (
+                  <div className="mt-2 flex items-start gap-1.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 p-2.5 text-xs text-rose-700 dark:text-rose-300">
+                    <AlertCircle className="h-4 w-4 shrink-0 text-rose-500 mt-0.5" />
+                    <p className="text-[11px] leading-relaxed">
+                      {language === 'id' 
+                        ? `Saldo dompet "${sourceWalletObj.name}" adalah ${formatCurrency(sourceWalletObj.balance, sourceWalletObj.currency)}. Anda tidak dapat membuat pengeluaran dari dompet yang kosong atau bersaldo kurang.`
+                        : `Wallet balance is ${formatCurrency(sourceWalletObj.balance, sourceWalletObj.currency)}. Expenses cannot be made from this wallet.`}
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Target Wallet (if transfer) OR Category */}
@@ -638,7 +698,12 @@ export const TransactionModal: React.FC = () => {
             <div className="pt-2">
               <button
                 type="submit"
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 py-3 text-xs font-bold text-white shadow-md shadow-blue-600/30 hover:bg-blue-500 active:scale-[0.99] transition-all cursor-pointer"
+                disabled={(type === 'expense' || type === 'transfer') && !!sourceWalletObj && sourceWalletObj.balance <= 0}
+                className={`flex w-full items-center justify-center gap-2 rounded-xl py-3 text-xs font-bold text-white shadow-md active:scale-[0.99] transition-all cursor-pointer ${
+                  (type === 'expense' || type === 'transfer') && sourceWalletObj && sourceWalletObj.balance <= 0
+                    ? 'bg-slate-400 dark:bg-slate-700 cursor-not-allowed opacity-60 shadow-none'
+                    : 'bg-blue-600 shadow-blue-600/30 hover:bg-blue-500'
+                }`}
               >
                 {isEditMode ? (
                   <>
