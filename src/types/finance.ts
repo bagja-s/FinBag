@@ -84,3 +84,17 @@ export interface UserProfile {
   language?: SupportedLanguage;
 }
 
+export type AuditAction = 'CREATE' | 'UPDATE' | 'DELETE' | 'TRANSFER' | 'CLEAR';
+export type AuditEntity = 'TRANSACTION' | 'WALLET' | 'GOAL' | 'BUDGET' | 'DATABASE' | 'SECURITY';
+
+export interface AuditLogEntry {
+  id: string;
+  userId: string;
+  userEmail?: string;
+  timestamp: string;
+  action: AuditAction;
+  entity: AuditEntity;
+  summary: string;
+  details?: Record<string, any>;
+}
+

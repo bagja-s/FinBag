@@ -6,7 +6,10 @@ import {
   Transaction, 
   BudgetCategory, 
   SavingsGoal,
-  UserProfile 
+  UserProfile,
+  AuditAction,
+  AuditEntity,
+  AuditLogEntry
 } from '../types/finance';
 import { 
   INITIAL_WALLETS, 
@@ -129,6 +132,10 @@ interface FinanceContextType {
   addGoal: (goal: Omit<SavingsGoal, 'id' | 'currentAmount'>) => Promise<void>;
   contributeToGoal: (goalId: string, walletId: string, amount: number) => Promise<void>;
 
+  // Audit Logs
+  auditLogs: AuditLogEntry[];
+  logActivity: (action: AuditAction, entity: AuditEntity, summary: string, details?: Record<string, any>) => Promise<void>;
+
   // Export / Backup / Reset
   exportCSV: () => void;
   exportJSON: () => void;
@@ -246,6 +253,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     return saved ? JSON.parse(saved) : INITIAL_CATEGORIES;
   });
   const [goals, setGoals] = useState<SavingsGoal[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
 
   // Purge any legacy dummy data from localStorage
   useEffect(() => {
@@ -368,6 +376,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
       setCurrentUserProfile(null);
       setAppPinState(null);
       setIsAppUnlocked(true);
+      setAuditLogs([]);
       return;
     }
 
@@ -484,11 +493,27 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
       (error) => handleFirestoreError(error, OperationType.GET, goalsPath)
     );
 
+    // Listen to audit logs directly from Firestore
+    const auditLogsPath = `users/${userId}/audit_logs`;
+    const unsubscribeAudit = onSnapshot(
+      collection(db, auditLogsPath),
+      (snapshot) => {
+        const cloudLogs: AuditLogEntry[] = [];
+        snapshot.forEach((d) => {
+          cloudLogs.push({ id: d.id, ...d.data() } as AuditLogEntry);
+        });
+        cloudLogs.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+        setAuditLogs(cloudLogs.slice(0, 100));
+      },
+      (error) => handleFirestoreError(error, OperationType.GET, auditLogsPath)
+    );
+
     return () => {
       unsubscribeProfile();
       unsubscribeWallets();
       unsubscribeTxs();
       unsubscribeGoals();
+      unsubscribeAudit();
     };
   }, [user]);
 
@@ -601,6 +626,37 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     setWallets([]);
     setTransactions([]);
     setGoals([]);
+    setAuditLogs([]);
+  };
+
+  // Audit logging helper
+  const logActivity = async (
+    action: AuditAction,
+    entity: AuditEntity,
+    summary: string,
+    details?: Record<string, any>
+  ) => {
+    const newEntry: AuditLogEntry = {
+      id: `log_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      userId: user?.uid || 'local_user',
+      userEmail: user?.email || undefined,
+      timestamp: new Date().toISOString(),
+      action,
+      entity,
+      summary,
+      details: details ? JSON.parse(JSON.stringify(details)) : {},
+    };
+
+    setAuditLogs((prev) => [newEntry, ...prev.slice(0, 99)]);
+
+    if (user) {
+      const auditPath = `users/${user.uid}/audit_logs`;
+      try {
+        await setDoc(doc(db, auditPath, newEntry.id), cleanFirestoreData(newEntry));
+      } catch (err) {
+        console.warn('Audit log write warning:', err);
+      }
+    }
   };
 
   // Transaction mutations
@@ -673,6 +729,16 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
         handleFirestoreError(err, OperationType.WRITE, txPath);
       }
     }
+
+    // Record audit log
+    logActivity(
+      newTx.type === 'transfer' ? 'TRANSFER' : 'CREATE',
+      'TRANSACTION',
+      newTx.type === 'transfer'
+        ? `Transfer ${formatCurrency(newTx.amount, newTx.currency)}`
+        : `Catat ${newTx.type === 'income' ? 'Pemasukan' : 'Pengeluaran'}: ${newTx.description || 'Transaksi'} (${formatCurrency(newTx.amount, newTx.currency)})`,
+      { transactionId: newId, amount: newTx.amount, currency: newTx.currency, type: newTx.type }
+    );
   };
 
   const updateTransaction = async (
@@ -743,6 +809,14 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
         handleFirestoreError(err, OperationType.WRITE, txPath);
       }
     }
+
+    // Record audit log
+    logActivity(
+      'UPDATE',
+      'TRANSACTION',
+      `Ubah transaksi: ${updatedTx.description || updatedTx.id} (${formatCurrency(updatedTx.amount, updatedTx.currency)})`,
+      { transactionId: id, oldAmount: oldTx.amount, newAmount: updatedTx.amount }
+    );
   };
 
   const deleteTransaction = async (id: string) => {
@@ -782,6 +856,14 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
         handleFirestoreError(err, OperationType.DELETE, txPath);
       }
     }
+
+    // Record audit log
+    logActivity(
+      'DELETE',
+      'TRANSACTION',
+      `Hapus transaksi: ${txToDelete.description || txToDelete.id} (${formatCurrency(txToDelete.amount, txToDelete.currency)})`,
+      { transactionId: id, amount: txToDelete.amount, currency: txToDelete.currency }
+    );
   };
 
   // Wallet mutations
@@ -803,6 +885,14 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
         handleFirestoreError(err, OperationType.WRITE, path);
       }
     }
+
+    // Record audit log
+    logActivity(
+      'CREATE',
+      'WALLET',
+      `Tambah dompet baru: ${newWallet.name} (${formatCurrency(newWallet.balance, newWallet.currency)})`,
+      { walletId: newId, name: newWallet.name, currency: newWallet.currency, balance: newWallet.balance }
+    );
   };
 
   const updateWallet = async (
@@ -828,9 +918,18 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
         handleFirestoreError(err, OperationType.WRITE, path);
       }
     }
+
+    // Record audit log
+    logActivity(
+      'UPDATE',
+      'WALLET',
+      `Ubah data dompet: ${updatedWallet.name} (${formatCurrency(updatedWallet.balance, updatedWallet.currency)})`,
+      { walletId: id, name: updatedWallet.name, balance: updatedWallet.balance }
+    );
   };
 
   const deleteWallet = async (id: string) => {
+    const walletToDelete = wallets.find((w) => w.id === id);
     setWallets((prev) => prev.filter((w) => w.id !== id));
 
     if (user) {
@@ -841,6 +940,14 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
         handleFirestoreError(err, OperationType.DELETE, path);
       }
     }
+
+    // Record audit log
+    logActivity(
+      'DELETE',
+      'WALLET',
+      `Hapus dompet: ${walletToDelete?.name || id}`,
+      { walletId: id, name: walletToDelete?.name }
+    );
   };
 
   const transferFunds = async (
@@ -879,6 +986,14 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
         handleFirestoreError(err, OperationType.WRITE, path);
       }
     }
+
+    // Record audit log
+    logActivity(
+      'UPDATE',
+      'BUDGET',
+      `Perbarui pagu anggaran kategori ${categoryId}: ${formatCurrency(limit, baseCurrency)}/bulan`,
+      { categoryId, limit }
+    );
   };
 
   // Savings Goal mutations
@@ -901,6 +1016,14 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
         handleFirestoreError(err, OperationType.WRITE, path);
       }
     }
+
+    // Record audit log
+    logActivity(
+      'CREATE',
+      'GOAL',
+      `Tambah target tabungan: "${newGoal.title}" (${formatCurrency(newGoal.targetAmount, newGoal.currency)})`,
+      { goalId: newId, title: newGoal.title, targetAmount: newGoal.targetAmount, currency: newGoal.currency }
+    );
   };
 
   const contributeToGoal = async (goalId: string, walletId: string, amount: number) => {
@@ -946,6 +1069,14 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
         handleFirestoreError(err, OperationType.WRITE, path);
       }
     }
+
+    // Record audit log
+    logActivity(
+      'UPDATE',
+      'GOAL',
+      `Setor tabungan "${goal.title}": +${formatCurrency(amount, wallet.currency)}`,
+      { goalId, walletId, amount, targetAmount: updatedGoal.targetAmount, currentAmount: updatedGoal.currentAmount }
+    );
   };
 
   // Export functions
@@ -1039,6 +1170,14 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
       setWallets([]);
       setTransactions([]);
       setGoals([]);
+
+      // Record audit log
+      logActivity(
+        'CLEAR',
+        'DATABASE',
+        'Pengosongan seluruh data dompet, transaksi, dan target tabungan database cloud',
+        { timestamp: new Date().toISOString() }
+      );
     } catch (err) {
       console.error('Error clearing database data:', err);
     }
@@ -1109,6 +1248,8 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
         updateBudgetLimit,
         addGoal,
         contributeToGoal,
+        auditLogs,
+        logActivity,
         exportCSV,
         exportJSON,
         importJSON,

@@ -85,6 +85,21 @@
         "userId": { "type": "string", "maxLength": 128 }
       },
       "required": ["title", "targetAmount", "currentAmount", "currency", "userId"]
+    },
+    "auditLog": {
+      "title": "AuditLog",
+      "description": "Immutable change history log for data auditing and security",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "maxLength": 128 },
+        "userEmail": { "type": "string", "maxLength": 200 },
+        "timestamp": { "type": "string", "maxLength": 50 },
+        "action": { "type": "string", "enum": ["CREATE", "UPDATE", "DELETE", "TRANSFER", "CLEAR"] },
+        "entity": { "type": "string", "enum": ["TRANSACTION", "WALLET", "GOAL", "BUDGET", "DATABASE", "SECURITY"] },
+        "summary": { "type": "string", "maxLength": 250 },
+        "details": { "type": "object" }
+      },
+      "required": ["userId", "timestamp", "action", "entity", "summary"]
     }
   },
   "firestore": {
@@ -107,6 +122,10 @@
     "/users/{userId}/goals/{goalId}": {
       "schema": "goal",
       "description": "Stores financial savings goals for the user"
+    },
+    "/users/{userId}/audit_logs/{logId}": {
+      "schema": "auditLog",
+      "description": "Immutable audit trail records for changes performed by the user"
     }
   }
 }

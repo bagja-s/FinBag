@@ -172,6 +172,17 @@ export const translations = {
     openTutorial: 'Buka Tutorial Interaktif',
     appVersion: 'Versi Aplikasi',
 
+    // Audit & Activity Logs
+    auditLogTitle: 'Log Riwayat Perubahan Data',
+    auditLogSubtitle: 'Jejak audit otomatis untuk setiap penambahan, perubahan, dan penghapusan data',
+    noAuditLogs: 'Belum ada catatan log aktivitas.',
+    filterActionAll: 'Semua Aksi',
+    actionCreate: 'Dibuat',
+    actionUpdate: 'Diubah',
+    actionDelete: 'Dihapus',
+    actionTransfer: 'Transfer',
+    actionClear: 'Dikosongkan',
+
     // Monthly Report & Budget Trends (Recharts)
     monthlyReportTitle: 'Laporan Keuangan Bulanan',
     monthlyReportSubtitle: 'Perbandingan pengeluaran riil vs pagu anggaran per kategori',
@@ -453,6 +464,17 @@ export const translations = {
     tutorialSection: 'Guide & Help',
     openTutorial: 'Open Interactive Tutorial',
     appVersion: 'App Version',
+
+    // Audit & Activity Logs
+    auditLogTitle: 'Data Change & Audit Logs',
+    auditLogSubtitle: 'Automated audit trail for every created, modified, or deleted record',
+    noAuditLogs: 'No activity logs recorded yet.',
+    filterActionAll: 'All Actions',
+    actionCreate: 'Created',
+    actionUpdate: 'Updated',
+    actionDelete: 'Deleted',
+    actionTransfer: 'Transfer',
+    actionClear: 'Cleared',
 
     // Monthly Report & Budget Trends (Recharts)
     monthlyReportTitle: 'Monthly Financial Summary',

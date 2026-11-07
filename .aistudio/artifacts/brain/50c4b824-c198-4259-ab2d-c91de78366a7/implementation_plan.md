@@ -1,30 +1,51 @@
-# FinBag - Status Implementasi: Optimasi Motion & Kelembutan Modal
+# Implementasi Fitur Audit & Activity Log (Riwayat Perubahan Data)
 
-**Status**: SELESAI (COMPLETED)
+## Ringkasan Fitur
+Fitur Audit & Activity Log dirancang untuk mencatat dan melacak setiap tindakan penambahan, pengubahan, pemindahan saldo, serta penghapusan data secara otomatis dan persisten di database cloud.
 
----
+### 1. Model Data & Tipe (`src/types/finance.ts`)
+- **`AuditAction`**: `'CREATE' | 'UPDATE' | 'DELETE' | 'TRANSFER' | 'CLEAR'`
+- **`AuditEntity`**: `'TRANSACTION' | 'WALLET' | 'GOAL' | 'BUDGET' | 'DATABASE' | 'SECURITY'`
+- **`AuditLogEntry`**:
+  - `id`: string unik (`log_${Date.now()}_...`)
+  - `userId`: ID pengguna
+  - `userEmail`: Email pengguna akun
+  - `timestamp`: Format ISO 8601
+  - `action`: Jenis tindakan
+  - `entity`: Modul data terkait
+  - `summary`: Ringkasan deskripsi perubahan ramah pengguna
+  - `details`: Metadata detail (nominal, nama rekening, dsb.)
 
-### Ringkasan Pengerjaan
+### 2. Aturan Keamanan & Skema Database (`firebase-blueprint.json` & `firestore.rules`)
+- Koleksi: `/users/{userId}/audit_logs/{logId}`
+- **Immutabilitas**: Sesuai standar audit trail keamanan tinggi, log data yang sudah tercatat **hanya dapat dibaca dan dibuat** (`allow read, create: if isOwner(userId); allow update, delete: if false;`), mencegah manipulasi atau penghapusan riwayat transaksi.
+- Sudah dideploy ke Cloud Firestore melalui `deploy_firebase`.
 
-#### 1. Optimasi Kurva Animasi & Fisika Motion (`src/utils/motionVariants.ts`)
-- [x] **Kurva Transisi Standar iOS (`modalSpringVariants`)**:
-  - Menggantikan spring physics yang kaku dengan kurva *cubic-bezier* halus `[0.16, 1, 0.3, 1]` berdurasi 0.26s untuk kemunculan dan `[0.32, 0, 0.67, 0]` berdurasi 0.18s untuk penutupan.
-  - Menghilangkan *micro-stuttering* dan getaran osilasi pada frame awal.
-- [x] **Eliminasi Beban GPU Latar (`backdropVariants`)**:
-  - Mengoptimalkan transisi gelap latar belakang (*backdrop fade*) tanpa memaksa GPU me-*repaint* filter *backdrop-blur* berat di setiap frame animasi.
+### 3. Logika & Pemicu Mutasi Terpusat (`src/context/FinanceContext.tsx`)
+- Fungsi `logActivity()` terpasang otomatis pada setiap fungsi mutasi:
+  - `addTransaction`: Pemasukan, Pengeluaran, atau Transfer antar-dompet
+  - `updateTransaction`: Perubahan nominal / kategori / dompet
+  - `deleteTransaction`: Penghapusan transaksi
+  - `addWallet`: Penambahan rekening baru
+  - `updateWallet`: Pengubahan saldo / nama rekening
+  - `deleteWallet`: Penutupan rekening
+  - `updateBudgetLimit`: Penyesuaian pagu anggaran bulanan
+  - `addGoal`: Pembuatan target tabungan
+  - `contributeToGoal`: Penyetoran tabungan
+  - `clearAllDatabaseData`: Pengosongan database
+- Menyediakan *live listener* (`onSnapshot`) untuk sinkronisasi otomatis secara realtime antar-perangkat.
 
-#### 2. Implementasi `<AnimatePresence>` Penuh pada Modals
-- [x] **Modal Tambah/Edit Transaksi (`TransactionModal.tsx`)**:
-  - Menghilangkan *early return* yang memutus siklus hidup komponen secara mendadak.
-  - Membungkus portal modal dengan `<AnimatePresence>` sehingga transisi masuk dan keluar (*exit animation*) berjalan mulus di 60/120 FPS.
-  - Menambahkan *hint* akselerasi perangkat keras GPU `style={{ willChange: 'transform, opacity' }}`.
-- [x] **Modal Tambah/Edit Dompet (`AddWalletModal.tsx`)**:
-  - Menerapkan arsitektur `<AnimatePresence>` dan akselerasi GPU yang sama.
-- [x] **Dialog Konfirmasi (`ConfirmationModal.tsx`)**:
-  - Menyelaraskan `<AnimatePresence>` untuk animasi konfirmasi hapus dan perubahan.
+### 4. Tampilan Antarmuka Pengguna (UI)
+- **Menu Pengaturan (`src/components/views/SettingsView.tsx`)**:
+  - Kartu khusus "Log Riwayat Perubahan Data" dengan counter badge.
+  - Filter aksi interaktif: *Semua*, *Dibuat*, *Diubah*, *Dihapus*, *Transfer*, *Dikosongkan*.
+  - Indikator warna badge (Hijau: CREATE, Biru: UPDATE, Merah: DELETE, Ungu: TRANSFER, Amber: CLEAR).
+  - Waktu lengkap (tanggal, jam, menit, detik).
+- **Konsol Admin (`src/components/views/AdminView.tsx`)**:
+  - Kartu inspeksi riwayat audit sistem berlabel *Immutable Trail*.
 
-#### 3. Verifikasi Mutu & Sistem
-- [x] TypeScript Compiler (`tsc --noEmit`): 0 error.
-- [x] Vite Production Build (`vite build`): Berhasil tanpa kendala.
-- [x] Unit Test Suite (`npm test`): 15/15 tes lulus (100%).
-- [x] Dev Server: Berjalan normal (HTTP 200).
+### 5. Verifikasi & Pengujian
+- `compile_applet`: Berhasil tanpa error.
+- `lint_applet`: 0 error linting TypeScript.
+- `npm test`: 15/15 unit test berhasil lolos.
+- Server lokal: HTTP 200 OK.

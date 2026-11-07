@@ -17,10 +17,12 @@ import {
   Download,
   Upload,
   HelpCircle,
-  Info
+  Info,
+  History,
+  FileText
 } from 'lucide-react';
 import { ConfirmationModal } from '../common/ConfirmationModal';
-import { SupportedCurrency } from '../../types/finance';
+import { SupportedCurrency, AuditAction } from '../../types/finance';
 import { CURRENCY_METADATA } from '../../services/currencyService';
 
 export const SettingsView: React.FC = () => {
@@ -43,7 +45,8 @@ export const SettingsView: React.FC = () => {
     setBaseCurrency,
     exportCSV,
     exportJSON,
-    importJSON
+    importJSON,
+    auditLogs
   } = useFinance();
 
   const t = getTranslation(language);
@@ -69,6 +72,9 @@ export const SettingsView: React.FC = () => {
   const [importJsonInput, setImportJsonInput] = useState('');
   const [importJsonSuccess, setImportJsonSuccess] = useState(false);
   const [importJsonError, setImportJsonError] = useState<string | null>(null);
+
+  // Audit Log filter state
+  const [auditActionFilter, setAuditActionFilter] = useState<'ALL' | AuditAction>('ALL');
 
   const handleClearDatabase = async () => {
     setIsResetting(true);
@@ -467,7 +473,194 @@ export const SettingsView: React.FC = () => {
         </div>
       </div>
 
-      {/* 5. Guide & Help */}
+      {/* 5. Audit & Activity Logs */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800 gap-3">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-purple-500/10 text-purple-600 dark:bg-purple-500/20 dark:text-purple-400">
+              <History className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm font-bold text-slate-900 dark:text-white">
+                  {t.auditLogTitle}
+                </h2>
+                <span className="rounded-full bg-purple-100 dark:bg-purple-950/60 px-2 py-0.5 text-[11px] font-mono font-bold text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                  {auditLogs.length}
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                {t.auditLogSubtitle}
+              </p>
+            </div>
+          </div>
+
+          {/* Action Filter Pills */}
+          <div className="flex flex-wrap items-center gap-1.5 p-1 rounded-xl bg-slate-100 dark:bg-slate-800/80">
+            <button
+              onClick={() => setAuditActionFilter('ALL')}
+              className={`px-2.5 py-1 text-[11px] font-semibold rounded-lg transition-colors cursor-pointer ${
+                auditActionFilter === 'ALL'
+                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
+                  : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              {t.filterActionAll}
+            </button>
+            <button
+              onClick={() => setAuditActionFilter('CREATE')}
+              className={`px-2 py-1 text-[11px] font-semibold rounded-lg transition-colors cursor-pointer ${
+                auditActionFilter === 'CREATE'
+                  ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-300 shadow-xs'
+                  : 'text-slate-500 hover:text-emerald-600 dark:hover:text-emerald-400'
+              }`}
+            >
+              {t.actionCreate}
+            </button>
+            <button
+              onClick={() => setAuditActionFilter('UPDATE')}
+              className={`px-2 py-1 text-[11px] font-semibold rounded-lg transition-colors cursor-pointer ${
+                auditActionFilter === 'UPDATE'
+                  ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/80 dark:text-blue-300 shadow-xs'
+                  : 'text-slate-500 hover:text-blue-600 dark:hover:text-blue-400'
+              }`}
+            >
+              {t.actionUpdate}
+            </button>
+            <button
+              onClick={() => setAuditActionFilter('DELETE')}
+              className={`px-2 py-1 text-[11px] font-semibold rounded-lg transition-colors cursor-pointer ${
+                auditActionFilter === 'DELETE'
+                  ? 'bg-rose-50 text-rose-700 dark:bg-rose-950/80 dark:text-rose-300 shadow-xs'
+                  : 'text-slate-500 hover:text-rose-600 dark:hover:text-rose-400'
+              }`}
+            >
+              {t.actionDelete}
+            </button>
+            <button
+              onClick={() => setAuditActionFilter('TRANSFER')}
+              className={`px-2 py-1 text-[11px] font-semibold rounded-lg transition-colors cursor-pointer ${
+                auditActionFilter === 'TRANSFER'
+                  ? 'bg-purple-50 text-purple-700 dark:bg-purple-950/80 dark:text-purple-300 shadow-xs'
+                  : 'text-slate-500 hover:text-purple-600 dark:hover:text-purple-400'
+              }`}
+            >
+              {t.actionTransfer}
+            </button>
+            <button
+              onClick={() => setAuditActionFilter('CLEAR')}
+              className={`px-2 py-1 text-[11px] font-semibold rounded-lg transition-colors cursor-pointer ${
+                auditActionFilter === 'CLEAR'
+                  ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/80 dark:text-amber-300 shadow-xs'
+                  : 'text-slate-500 hover:text-amber-600 dark:hover:text-amber-400'
+              }`}
+            >
+              {t.actionClear}
+            </button>
+          </div>
+        </div>
+
+        {/* Audit Log Items */}
+        <div className="mt-4">
+          {(() => {
+            const filteredLogs = auditLogs.filter((log) => {
+              if (auditActionFilter === 'ALL') return true;
+              return log.action === auditActionFilter;
+            });
+
+            if (filteredLogs.length === 0) {
+              return (
+                <div className="flex flex-col items-center justify-center py-10 px-4 text-center rounded-xl border border-dashed border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30">
+                  <FileText className="h-8 w-8 text-slate-300 dark:text-slate-600 mb-2" />
+                  <p className="text-xs font-semibold text-slate-600 dark:text-slate-400">
+                    {t.noAuditLogs}
+                  </p>
+                  <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">
+                    {language === 'id'
+                      ? 'Setiap mutasi saldo, penambahan dompet, atau perubahan data akan tercatat otomatis di sini.'
+                      : 'Every balance transaction, new wallet, or data modification will be automatically recorded here.'}
+                  </p>
+                </div>
+              );
+            }
+
+            return (
+              <div className="space-y-2.5 max-h-96 overflow-y-auto pr-1">
+                {filteredLogs.map((item) => {
+                  const dateObj = new Date(item.timestamp);
+                  const formattedTime = dateObj.toLocaleDateString(language === 'id' ? 'id-ID' : 'en-US', {
+                    day: 'numeric',
+                    month: 'short',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                  });
+
+                  // Color theme according to action
+                  let badgeClass = 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-200 dark:border-slate-700';
+                  let badgeText: string = item.action;
+                  if (item.action === 'CREATE') {
+                    badgeClass = 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800';
+                    badgeText = t.actionCreate;
+                  } else if (item.action === 'UPDATE') {
+                    badgeClass = 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-400 border-blue-200 dark:border-blue-800';
+                    badgeText = t.actionUpdate;
+                  } else if (item.action === 'DELETE') {
+                    badgeClass = 'bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400 border-rose-200 dark:border-rose-800';
+                    badgeText = t.actionDelete;
+                  } else if (item.action === 'TRANSFER') {
+                    badgeClass = 'bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-400 border-purple-200 dark:border-purple-800';
+                    badgeText = t.actionTransfer;
+                  } else if (item.action === 'CLEAR') {
+                    badgeClass = 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400 border-amber-200 dark:border-amber-800';
+                    badgeText = t.actionClear;
+                  }
+
+                  return (
+                    <div
+                      key={item.id}
+                      className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40 hover:bg-slate-100/70 dark:hover:bg-slate-800/60 transition-colors gap-2"
+                    >
+                      <div className="flex items-start gap-2.5 min-w-0">
+                        <span className={`shrink-0 inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold border ${badgeClass}`}>
+                          {badgeText}
+                        </span>
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">
+                            {item.summary}
+                          </p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500">
+                              {item.entity}
+                            </span>
+                            {item.userEmail && (
+                              <>
+                                <span className="text-slate-300 dark:text-slate-600">•</span>
+                                <span className="text-[10px] text-slate-400 dark:text-slate-500 truncate max-w-[140px]">
+                                  {item.userEmail}
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="shrink-0 text-left sm:text-right">
+                        <span className="text-[11px] font-mono text-slate-400 dark:text-slate-500">
+                          {formattedTime}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
+        </div>
+      </div>
+
+      {/* 6. Guide & Help */}
       <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">

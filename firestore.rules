@@ -77,6 +77,15 @@ service cloud.firestore {
         data.currency is string && data.currency.size() <= 5;
     }
 
+    function isValidAuditLog(data, userId) {
+      return data.keys().hasAll(['userId', 'timestamp', 'action', 'entity', 'summary']) &&
+        data.userId == userId &&
+        data.action in ['CREATE', 'UPDATE', 'DELETE', 'TRANSFER', 'CLEAR'] &&
+        data.entity in ['TRANSACTION', 'WALLET', 'GOAL', 'BUDGET', 'DATABASE', 'SECURITY'] &&
+        data.summary is string && data.summary.size() <= 250 &&
+        data.timestamp is string && data.timestamp.size() <= 50;
+    }
+
     // User document & subcollections
     match /users/{userId} {
       allow get: if isOwner(userId) || isAdmin();
@@ -111,6 +120,13 @@ service cloud.firestore {
         allow read: if isOwner(userId) || isAdmin();
         allow create, update: if isOwner(userId) && isValidId(goalId) && isValidGoal(incoming(), userId);
         allow delete: if (isOwner(userId) || isAdmin()) && isValidId(goalId);
+      }
+
+      // Audit logs subcollection (Immutable audit trail: allow read and create only)
+      match /audit_logs/{logId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow create: if isOwner(userId) && isValidId(logId) && isValidAuditLog(incoming(), userId);
+        allow update, delete: if false; // Strict immutability
       }
     }
   }
