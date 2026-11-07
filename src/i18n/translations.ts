@@ -155,8 +155,6 @@ export const translations = {
     currencyLabel: 'Mata Uang Utama',
     securitySection: 'Keamanan & Privasi',
     pinLabel: 'Kunci PIN Aplikasi',
-    pinEnabled: 'Kunci PIN Aktif',
-    pinDisabled: 'Kunci PIN Nonaktif',
     pinChange: 'Ubah PIN',
     pinRemove: 'Hapus PIN',
     pinSet: 'Atur PIN Baru',
@@ -166,9 +164,6 @@ export const translations = {
     notificationsSection: 'Notifikasi Push',
     notificationsDesc: 'Peringatan anggaran, pencapaian tabungan, dan pengingat harian',
     dataSection: 'Manajemen Data',
-    exportCSV: 'Ekspor CSV',
-    exportJSON: 'Cadangkan Data (JSON)',
-    importJSON: 'Pulihkan Data (JSON)',
     importSuccess: 'Data berhasil dipulihkan',
     importError: 'Gagal memulihkan data. Format JSON tidak valid.',
     clearDatabase: 'Kosongkan Database',
@@ -225,7 +220,6 @@ export const translations = {
     installBannerDesc: 'Akses cepat dari layar utama Anda, bebas unduhan store, dan dapat bekerja secara offline.',
 
     // Creator Admin Console
-    navAdmin: 'Konsol Admin',
     adminTitle: 'Konsol Admin & Diagnostik',
     adminSubtitle: 'Pusat kendali dan status sistem infrastruktur FinBag',
     adminRoleBadge: 'Pembuat Aplikasi & Super Admin',
@@ -245,6 +239,7 @@ export const translations = {
     maintenanceExpiryHelper: 'Kosongkan untuk banner permanen. Format: YYYY-MM-DD HH:mm (24 jam).',
     maintenanceExpirySet: 'Timer banner diatur.',
     maintenanceExpiryCleared: 'Timer banner dihapus (permanen).',
+    maintenanceUntil: 'Berakhir pada',
     operational: 'Beroperasi Normal',
     creatorAccount: 'Akun Pembuat Aplikasi',
 
@@ -442,8 +437,6 @@ export const translations = {
     currencyLabel: 'Base Currency',
     securitySection: 'Security & Privacy',
     pinLabel: 'App PIN Lock',
-    pinEnabled: 'PIN Lock Active',
-    pinDisabled: 'PIN Lock Inactive',
     pinChange: 'Change PIN',
     pinRemove: 'Remove PIN',
     pinSet: 'Set New PIN',
@@ -453,9 +446,6 @@ export const translations = {
     notificationsSection: 'Push Notifications',
     notificationsDesc: 'Budget warnings, savings milestones, and daily reminders',
     dataSection: 'Data Management',
-    exportCSV: 'Export CSV',
-    exportJSON: 'Backup Data (JSON)',
-    importJSON: 'Restore Data (JSON)',
     importSuccess: 'Data restored successfully',
     importError: 'Failed to restore data. Invalid JSON format.',
     clearDatabase: 'Clear Database',
@@ -512,7 +502,6 @@ export const translations = {
     installBannerDesc: 'Access directly from your home screen with zero app store delays, plus full offline caching.',
 
     // Creator Admin Console
-    navAdmin: 'Admin Console',
     adminTitle: 'Admin Console & Diagnostics',
     adminSubtitle: 'FinBag infrastructure control panel and real-time system metrics',
     adminRoleBadge: 'App Creator & Super Admin',
@@ -532,6 +521,7 @@ export const translations = {
     maintenanceExpiryHelper: 'Leave empty for permanent banner. Format: YYYY-MM-DD HH:mm (24-hour).',
     maintenanceExpirySet: 'Banner timer set.',
     maintenanceExpiryCleared: 'Banner timer cleared (permanent).',
+    maintenanceUntil: 'Expires at',
     operational: 'Operational',
     creatorAccount: 'App Creator Account',
 

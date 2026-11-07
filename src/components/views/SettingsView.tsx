@@ -2,38 +2,22 @@ import React, { useState } from 'react';
 import { useFinance } from '../../context/FinanceContext';
 import { getTranslation } from '../../i18n/translations';
 import {
-  formatCurrency,
-  calculate503020Rule,
-  calculateSplitBill
-} from '../../utils/financeCalculations';
-import {
-  Target,
-  PieChart,
-  Users,
   Lock,
-  Plus,
-  ShieldCheck,
-  Plane,
-  Laptop,
+  Check,
   CheckCircle2,
-  DollarSign,
   Database,
   AlertTriangle,
   Trash2,
   Sparkles,
   Bell,
   BellRing,
-  Settings,
   Globe,
   Sun,
   Moon,
   Download,
   Upload,
   HelpCircle,
-  Info,
-  RefreshCw,
-  Save,
-  X
+  Info
 } from 'lucide-react';
 import { ConfirmationModal } from '../common/ConfirmationModal';
 import { SupportedCurrency } from '../../types/finance';
@@ -42,16 +26,11 @@ import { CURRENCY_METADATA } from '../../services/currencyService';
 export const SettingsView: React.FC = () => {
   const {
     goals,
-    addGoal,
-    contributeToGoal,
     transactions,
-    categories,
     wallets,
     baseCurrency,
-    exchangeRates,
     appPin,
     setAppPin,
-    addTransaction,
     clearAllDatabaseData,
     openTutorial,
     notificationPermission,
@@ -64,8 +43,7 @@ export const SettingsView: React.FC = () => {
     setBaseCurrency,
     exportCSV,
     exportJSON,
-    importJSON,
-    isAdmin
+    importJSON
   } = useFinance();
 
   const t = getTranslation(language);
@@ -74,24 +52,6 @@ export const SettingsView: React.FC = () => {
   const [isRequestingNotification, setIsRequestingNotification] = useState(false);
   const [isSendingTestNotification, setIsSendingTestNotification] = useState(false);
   const [testNotificationSentMsg, setTestNotificationSentMsg] = useState(false);
-
-  // Goal Creation Form State
-  const [showAddGoal, setShowAddGoal] = useState(false);
-  const [goalTitle, setGoalTitle] = useState('');
-  const [goalTargetStr, setGoalTargetStr] = useState('');
-  const [goalDate, setGoalDate] = useState('');
-
-  // Goal Contribution State
-  const [contributeGoalId, setContributeGoalId] = useState<string | null>(null);
-  const [contributeWalletId, setContributeWalletId] = useState<string>(wallets[0]?.id || '');
-  const [contributeAmountStr, setContributeAmountStr] = useState('');
-
-  // Split Bill State
-  const [billTotal, setBillTotal] = useState<string>('350000');
-  const [billTax, setBillTax] = useState<string>('10');
-  const [billService, setBillService] = useState<string>('5');
-  const [billPeople, setBillPeople] = useState<string>('4');
-  const [billSuccessMsg, setBillSuccessMsg] = useState(false);
 
   // PIN settings state
   const [newPinInput, setNewPinInput] = useState('');
@@ -122,50 +82,6 @@ export const SettingsView: React.FC = () => {
     } finally {
       setIsResetting(false);
     }
-  };
-
-  const handleCreateGoal = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const target = parseFloat(goalTargetStr);
-    if (!goalTitle.trim() || isNaN(target) || target <= 0) return;
-
-    await addGoal({
-      title: goalTitle.trim(),
-      targetAmount: target,
-      currency: baseCurrency,
-      targetDate: goalDate || undefined,
-      color: '#3B82F6',
-      icon: 'Target',
-    });
-
-    setGoalTitle('');
-    setGoalTargetStr('');
-    setGoalDate('');
-    setShowAddGoal(false);
-  };
-
-  const handleContribute = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const amount = parseFloat(contributeAmountStr);
-    if (!contributeGoalId || isNaN(amount) || amount <= 0) return;
-
-    await contributeToGoal(contributeGoalId, contributeWalletId, amount);
-    setContributeAmountStr('');
-    setContributeGoalId(null);
-  };
-
-  const handleRecordMyShare = async () => {
-    await addTransaction({
-      date: new Date().toISOString().split('T')[0],
-      amount: splitResult.perPerson,
-      currency: baseCurrency,
-      type: 'expense',
-      categoryId: 'food',
-      sourceWalletId: wallets[0]?.id || 'w_cash',
-      description: `Split Bill: Bayar Bareng (${billPeople} Orang)`,
-    });
-    setBillSuccessMsg(true);
-    setTimeout(() => setBillSuccessMsg(false), 3000);
   };
 
   const handleSavePin = () => {
@@ -206,22 +122,12 @@ export const SettingsView: React.FC = () => {
       } else {
         setImportJsonError(t.importError);
       }
-    } catch (e) {
+    } catch {
       setImportJsonError(t.importError);
     }
   };
 
   const currencies: SupportedCurrency[] = ['IDR', 'USD', 'EUR', 'SGD', 'MYR', 'JPY', 'GBP', 'AUD'];
-
-  const currentMonthStr = new Date().toISOString().slice(0, 7);
-  const rule503020 = calculate503020Rule(transactions, categories, currentMonthStr, exchangeRates.rates, baseCurrency);
-
-  const splitResult = calculateSplitBill(
-    parseFloat(billTotal) || 0,
-    parseFloat(billTax) || 0,
-    parseFloat(billService) || 0,
-    parseInt(billPeople, 10) || 1
-  );
 
   return (
     <div className="space-y-6 pb-20 lg:pb-8">

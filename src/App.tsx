@@ -22,7 +22,7 @@ import { AddWalletModal } from './components/modals/AddWalletModal';
 import { PinLockModal } from './components/modals/PinLockModal';
 import { OnboardingTutorialModal } from './components/onboarding/OnboardingTutorialModal';
 import { useOnlineStatus } from './hooks/useOnlineStatus';
-import { WifiOff, Loader2, UserX } from 'lucide-react';
+import { WifiOff, Loader2, UserX, Clock } from 'lucide-react';
 import { getTranslation } from './i18n/translations';
 import { AnimatePresence, motion } from 'motion/react';
 import { pageVariants } from './utils/motionVariants';
@@ -38,7 +38,8 @@ const MainLayout: React.FC = () => {
     activeTab, 
     appPin, 
     isAppUnlocked, 
-    announcementNotice 
+    announcementNotice,
+    announcementExpiry
   } = useFinance();
   const isOnline = useOnlineStatus();
   const t = getTranslation(language);
@@ -112,11 +113,17 @@ const MainLayout: React.FC = () => {
         <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-full overflow-x-hidden min-h-[calc(100vh-3.5rem)]">
           {/* System Announcement Notice (if set by Creator) */}
           {announcementNotice && (
-            <div className="mb-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 px-4 py-3 text-xs font-semibold text-amber-800 dark:text-amber-200 flex items-center justify-between shadow-xs">
+            <div className="mb-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 px-4 py-3 text-xs font-semibold text-amber-800 dark:text-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-xs">
               <div className="flex items-center gap-2">
-                <span className="flex h-2 w-2 rounded-full bg-amber-500 animate-ping" />
+                <span className="flex h-2 w-2 rounded-full bg-amber-500 animate-ping shrink-0" />
                 <span>{announcementNotice}</span>
               </div>
+              {announcementExpiry && (
+                <div className="flex items-center gap-1.5 text-[11px] text-amber-700 dark:text-amber-300 font-mono bg-amber-500/15 border border-amber-500/20 px-2.5 py-1 rounded-xl shrink-0">
+                  <Clock className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                  <span>{t.maintenanceUntil}: {new Date(announcementExpiry).toLocaleString(language === 'id' ? 'id-ID' : 'en-US', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                </div>
+              )}
             </div>
           )}
 
