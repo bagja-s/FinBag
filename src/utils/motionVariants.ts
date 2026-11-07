@@ -53,43 +53,48 @@ export const cardItemVariants: Variants = {
   },
 };
 
-// Spring modal dialog entry & exit
+// Silky smooth modal dialog entry & exit (GPU optimized with iOS-standard bezier)
 export const modalSpringVariants: Variants = {
   hidden: {
     opacity: 0,
-    scale: 0.94,
-    y: 16,
+    scale: 0.96,
+    y: 12,
   },
   visible: {
     opacity: 1,
     scale: 1,
     y: 0,
     transition: {
-      type: 'spring',
-      stiffness: 380,
-      damping: 28,
+      duration: 0.26,
+      ease: [0.16, 1, 0.3, 1], // Apple standard smooth ease-out
     },
   },
   exit: {
     opacity: 0,
-    scale: 0.96,
-    y: 10,
+    scale: 0.97,
+    y: 8,
     transition: {
-      duration: 0.16,
-      ease: [0.4, 0, 0.2, 1],
+      duration: 0.18,
+      ease: [0.32, 0, 0.67, 0], // Smooth ease-in exit
     },
   },
 };
 
-// Backdrop fade
+// Backdrop fade (Lightweight opacity without GPU blur repaint)
 export const backdropVariants: Variants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
-    transition: { duration: 0.2 },
+    transition: {
+      duration: 0.22,
+      ease: [0.16, 1, 0.3, 1],
+    },
   },
   exit: {
     opacity: 0,
-    transition: { duration: 0.15 },
+    transition: {
+      duration: 0.16,
+      ease: [0.32, 0, 0.67, 0],
+    },
   },
 };

@@ -4,7 +4,7 @@ import { useFinance } from '../../context/FinanceContext';
 import { getTranslation } from '../../i18n/translations';
 import { WalletType, SupportedCurrency } from '../../types/finance';
 import { X, Wallet, Edit3 } from 'lucide-react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { modalSpringVariants, backdropVariants } from '../../utils/motionVariants';
 
 export const AddWalletModal: React.FC = () => {
@@ -49,8 +49,6 @@ export const AddWalletModal: React.FC = () => {
     }
     setErrorMsg('');
   }, [editingWallet, isAddWalletModalOpen, baseCurrency]);
-
-  if (!isAddWalletModalOpen) return null;
 
   const colorPalette = [
     '#2563EB', '#059669', '#D97706', '#7C3AED', 
@@ -104,28 +102,35 @@ export const AddWalletModal: React.FC = () => {
   if (typeof document === 'undefined') return null;
 
   return createPortal(
-    <motion.div 
-      variants={backdropVariants}
-      initial="hidden"
-      animate="visible"
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4"
-    >
-      {/* Click outside backdrop */}
-      <div 
-        className="fixed inset-0"
-        onClick={handleClose}
-        aria-hidden="true"
-      />
+    <AnimatePresence>
+      {isAddWalletModalOpen && (
+        <motion.div 
+          key="add-wallet-backdrop"
+          variants={backdropVariants}
+          initial="hidden"
+          animate="visible"
+          exit="exit"
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 p-0 sm:p-4 backdrop-blur-[2px]"
+        >
+          {/* Click outside backdrop */}
+          <div 
+            className="fixed inset-0"
+            onClick={handleClose}
+            aria-hidden="true"
+          />
 
-      <motion.div 
-        variants={modalSpringVariants}
-        initial="hidden"
-        animate="visible"
-        className="relative z-10 w-full max-w-md rounded-t-3xl sm:rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-900"
-        role="dialog"
-      >
-        <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-          <div className="flex items-center gap-2">
+          <motion.div 
+            key="add-wallet-dialog"
+            variants={modalSpringVariants}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+            style={{ willChange: 'transform, opacity' }}
+            className="relative z-10 w-full max-w-md rounded-t-3xl sm:rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-900"
+            role="dialog"
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-2">
             <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${
               isEditing ? 'bg-amber-100 text-amber-600 dark:bg-amber-950 dark:text-amber-400' : 'bg-blue-100 text-blue-600 dark:bg-blue-950 dark:text-blue-400'
             }`}>
@@ -257,7 +262,9 @@ export const AddWalletModal: React.FC = () => {
           </div>
         </form>
       </motion.div>
-    </motion.div>,
+    </motion.div>
+      )}
+    </AnimatePresence>,
     document.body
   );
 };

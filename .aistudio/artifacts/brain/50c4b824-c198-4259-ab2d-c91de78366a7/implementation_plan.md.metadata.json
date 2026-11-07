@@ -1,6 +1,6 @@
 {
-  "summary": "Pembaruan implementasi navigasi: tombol Pengaturan terintegrasi ke dalam menu foto profil (desktop dropdown & mobile drawer), dan menu Alat & Lainnya (Target Tabungan, 50/30/20, Split Bill) dimunculkan kembali di navigasi bawah mobile dan sidebar desktop.",
-  "updatedAt": "2026-11-07T01:01:50.364411468Z",
+  "summary": "Optimasi performa motion dan micro-interactions pada TransactionModal, AddWalletModal, dan ConfirmationModal: penggunaan AnimatePresence penuh, eliminasi bottleneck repaint backdrop blur berat, kurva cubic-bezier standar iOS, dan akselerasi perangkat keras GPU willChange.",
+  "updatedAt": "2026-11-07T01:12:17.340707793Z",
   "requestFeedback": true,
   "userFacing": true
 }

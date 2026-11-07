@@ -1,4 +1,4 @@
-# FinBag - Status Implementasi: Integrasi Pengaturan ke Profil & Restorasi Menu Alat
+# FinBag - Status Implementasi: Optimasi Motion & Kelembutan Modal
 
 **Status**: SELESAI (COMPLETED)
 
@@ -6,23 +6,25 @@
 
 ### Ringkasan Pengerjaan
 
-#### 1. Tombol Pengaturan di Menu Foto Profil (`src/components/TopBar.tsx`)
-- [x] **Desktop Dropdown Menu**: Menambahkan tombol "Pengaturan" dengan ikon *Settings* yang langsung membuka tab `settings` ketika foto profil atau nama pengguna diklik.
-- [x] **Mobile Drawer Menu**: Menambahkan tombol "Pengaturan" di menu laci mobile saat foto profil pengguna diketuk.
+#### 1. Optimasi Kurva Animasi & Fisika Motion (`src/utils/motionVariants.ts`)
+- [x] **Kurva Transisi Standar iOS (`modalSpringVariants`)**:
+  - Menggantikan spring physics yang kaku dengan kurva *cubic-bezier* halus `[0.16, 1, 0.3, 1]` berdurasi 0.26s untuk kemunculan dan `[0.32, 0, 0.67, 0]` berdurasi 0.18s untuk penutupan.
+  - Menghilangkan *micro-stuttering* dan getaran osilasi pada frame awal.
+- [x] **Eliminasi Beban GPU Latar (`backdropVariants`)**:
+  - Mengoptimalkan transisi gelap latar belakang (*backdrop fade*) tanpa memaksa GPU me-*repaint* filter *backdrop-blur* berat di setiap frame animasi.
 
-#### 2. Restorasi Menu Alat & Lainnya (`src/components/BottomNav.tsx`)
-- [x] **Navigasi Bawah Mobile**:
-  - Slot 1: Ringkasan / Dashboard (`LayoutDashboard`)
-  - Slot 2: Dompet & Rekening (`Wallet`)
-  - Slot 3: FAB Catat Cepat (`Plus`)
-  - Slot 4: **Riwayat Transaksi** (`History`)
-  - Slot 5: **Alat & Fitur Lainnya** (`Grid`) — Menampilkan Target Tabungan, Evaluasi 50/30/20, dan Split Bill
+#### 2. Implementasi `<AnimatePresence>` Penuh pada Modals
+- [x] **Modal Tambah/Edit Transaksi (`TransactionModal.tsx`)**:
+  - Menghilangkan *early return* yang memutus siklus hidup komponen secara mendadak.
+  - Membungkus portal modal dengan `<AnimatePresence>` sehingga transisi masuk dan keluar (*exit animation*) berjalan mulus di 60/120 FPS.
+  - Menambahkan *hint* akselerasi perangkat keras GPU `style={{ willChange: 'transform, opacity' }}`.
+- [x] **Modal Tambah/Edit Dompet (`AddWalletModal.tsx`)**:
+  - Menerapkan arsitektur `<AnimatePresence>` dan akselerasi GPU yang sama.
+- [x] **Dialog Konfirmasi (`ConfirmationModal.tsx`)**:
+  - Menyelaraskan `<AnimatePresence>` untuk animasi konfirmasi hapus dan perubahan.
 
-#### 3. Restorasi Menu Alat di Sidebar Desktop (`src/components/Sidebar.tsx`)
-- [x] Menambahkan kembali menu **Alat & Lainnya** (`Grid`) ke dalam `navItems` bersama menu Ringkasan, Dompet, Kurs Live, Anggaran, Riwayat Transaksi, dan Pengaturan.
-
-#### 4. Pengujian & Verifikasi Mutu
-- [x] TypeScript validation (`tsc --noEmit`): 0 error.
-- [x] Vite production build (`vite build`): Sukses terkompilasi.
-- [x] Unit test suite (`npm test`): 15/15 tes lulus (100%).
-- [x] Dev server aktif dan merespons HTTP 200 di port 3000.
+#### 3. Verifikasi Mutu & Sistem
+- [x] TypeScript Compiler (`tsc --noEmit`): 0 error.
+- [x] Vite Production Build (`vite build`): Berhasil tanpa kendala.
+- [x] Unit Test Suite (`npm test`): 15/15 tes lulus (100%).
+- [x] Dev Server: Berjalan normal (HTTP 200).

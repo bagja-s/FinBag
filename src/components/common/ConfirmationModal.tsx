@@ -40,8 +40,6 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, isLoading, onCancel]);
 
-  if (!isOpen) return null;
-
   const getVariantStyles = () => {
     switch (variant) {
       case 'danger':
@@ -71,30 +69,37 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
   if (typeof document === 'undefined') return null;
 
   return createPortal(
-    <motion.div 
-      variants={backdropVariants}
-      initial="hidden"
-      animate="visible"
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="confirm-modal-title"
-    >
-      {/* Click outside backdrop to cancel */}
-      <div 
-        className="fixed inset-0" 
-        onClick={() => { if (!isLoading) onCancel(); }}
-        aria-hidden="true" 
-      />
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div 
+          key="confirm-modal-backdrop"
+          variants={backdropVariants}
+          initial="hidden"
+          animate="visible"
+          exit="exit"
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 p-0 sm:p-4 backdrop-blur-[2px]"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="confirm-modal-title"
+        >
+          {/* Click outside backdrop to cancel */}
+          <div 
+            className="fixed inset-0" 
+            onClick={() => { if (!isLoading) onCancel(); }}
+            aria-hidden="true" 
+          />
 
-      <motion.div 
-        variants={modalSpringVariants}
-        initial="hidden"
-        animate="visible"
-        className="relative z-10 w-full max-w-md rounded-t-3xl sm:rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-900"
-      >
-        {/* Mobile Drag Indicator */}
-        <div className="w-10 h-1 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto mb-3 sm:hidden" />
+          <motion.div 
+            key="confirm-modal-dialog"
+            variants={modalSpringVariants}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+            style={{ willChange: 'transform, opacity' }}
+            className="relative z-10 w-full max-w-md rounded-t-3xl sm:rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-900"
+          >
+            {/* Mobile Drag Indicator */}
+            <div className="w-10 h-1 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto mb-3 sm:hidden" />
 
         <div className="flex items-start gap-3.5">
           <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${iconBg} shadow-sm transition-transform duration-200 scale-100`}>
@@ -155,8 +160,10 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
             <span>{confirmText}</span>
           </button>
         </div>
-      </motion.div>
-    </motion.div>,
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>,
     document.body
   );
 };

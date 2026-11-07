@@ -21,7 +21,7 @@ import {
   Loader2,
   CheckCircle2
 } from 'lucide-react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { modalSpringVariants, backdropVariants } from '../../utils/motionVariants';
 
 export const TransactionModal: React.FC = () => {
@@ -100,8 +100,6 @@ export const TransactionModal: React.FC = () => {
       setScanSuccessMessage(null);
     }
   }, [isTransactionModalOpen, editingTransaction, baseCurrency, wallets, categories]);
-
-  if (!isTransactionModalOpen) return null;
 
   const quickAmounts = currency === 'IDR'
     ? [20000, 50000, 100000, 250000, 500000, 1000000]
@@ -292,29 +290,36 @@ export const TransactionModal: React.FC = () => {
   return (
     <>
       {createPortal(
-        <motion.div 
-          variants={backdropVariants}
-          initial="hidden"
-          animate="visible"
-          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4"
-        >
-          {/* Backdrop click dismiss */}
-          <div 
-            className="fixed inset-0"
-            onClick={handleClose}
-            aria-hidden="true"
-          />
+        <AnimatePresence>
+          {isTransactionModalOpen && (
+            <motion.div 
+              key="transaction-modal-backdrop"
+              variants={backdropVariants}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+              className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 p-0 sm:p-4 backdrop-blur-[2px]"
+            >
+              {/* Backdrop click dismiss */}
+              <div 
+                className="fixed inset-0"
+                onClick={handleClose}
+                aria-hidden="true"
+              />
 
-          <motion.div 
-            variants={modalSpringVariants}
-            initial="hidden"
-            animate="visible"
-            className="relative z-10 w-full max-w-lg rounded-t-3xl sm:rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-900 max-h-[92vh] overflow-y-auto"
-            role="dialog"
-            aria-modal="true"
-          >
-            {/* Mobile Drag Indicator */}
-            <div className="w-10 h-1 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto mb-3 sm:hidden" />
+              <motion.div 
+                key="transaction-modal-dialog"
+                variants={modalSpringVariants}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+                style={{ willChange: 'transform, opacity' }}
+                className="relative z-10 w-full max-w-lg rounded-t-3xl sm:rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-900 max-h-[92vh] overflow-y-auto"
+                role="dialog"
+                aria-modal="true"
+              >
+                {/* Mobile Drag Indicator */}
+                <div className="w-10 h-1 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto mb-3 sm:hidden" />
 
           <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
             <div className="flex items-center gap-2">
@@ -647,9 +652,11 @@ export const TransactionModal: React.FC = () => {
             </div>
           </form>
         </motion.div>
-      </motion.div>,
-      document.body
-    )}
+      </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
 
       {/* Confirmation Modal before applying changes */}
       <ConfirmationModal
