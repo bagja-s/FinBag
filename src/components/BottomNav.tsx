@@ -6,7 +6,7 @@ import {
   Wallet,
   Plus,
   History,
-  Settings
+  Grid
 } from 'lucide-react';
 
 export const BottomNav: React.FC = () => {
@@ -84,19 +84,19 @@ export const BottomNav: React.FC = () => {
           )}
         </button>
 
-        {/* Tab 5: Pengaturan */}
+        {/* Tab 5: Alat & Lainnya */}
         <button
-          onClick={() => setActiveTab('settings')}
-          aria-label={t.navSettings}
+          onClick={() => setActiveTab('tools')}
+          aria-label={t.navTools}
           className={`relative flex flex-col items-center justify-center gap-0.5 py-1 transition-all duration-200 active:scale-90 cursor-pointer ${
-            activeTab === 'settings'
+            activeTab === 'tools'
               ? 'text-blue-600 dark:text-blue-400 font-bold -translate-y-0.5'
               : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
           }`}
         >
-          <Settings className={`h-5 w-5 transition-transform duration-200 ${activeTab === 'settings' ? 'scale-110 stroke-[2.5]' : ''}`} />
-          <span className="text-[10px] tracking-tight">{t.navSettings}</span>
-          {activeTab === 'settings' && (
+          <Grid className={`h-5 w-5 transition-transform duration-200 ${activeTab === 'tools' ? 'scale-110 stroke-[2.5]' : ''}`} />
+          <span className="text-[10px] tracking-tight">{t.navTools}</span>
+          {activeTab === 'tools' && (
             <span className="h-1 w-1 rounded-full bg-blue-600 dark:bg-blue-400 animate-in zoom-in duration-200" />
           )}
         </button>

@@ -1,6 +1,6 @@
 {
-  "summary": "Rencana dan status implementasi untuk Halaman Pengaturan (Settings), Restrukturisasi Navigasi Bawah (Riwayat Transaksi & Pengaturan), dan Timer Kedaluwarsa Otomatis Banner Pemeliharaan.",
-  "updatedAt": "2026-11-07T00:04:45.975324216Z",
+  "summary": "Pembaruan implementasi navigasi: tombol Pengaturan terintegrasi ke dalam menu foto profil (desktop dropdown & mobile drawer), dan menu Alat & Lainnya (Target Tabungan, 50/30/20, Split Bill) dimunculkan kembali di navigasi bawah mobile dan sidebar desktop.",
+  "updatedAt": "2026-11-07T01:01:50.364411468Z",
   "requestFeedback": true,
   "userFacing": true
 }

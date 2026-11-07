@@ -8,6 +8,7 @@ import {
   TrendingUp,
   PieChart,
   History,
+  Grid,
   Settings,
   ShieldAlert,
   Download
@@ -34,6 +35,7 @@ export const Sidebar: React.FC = () => {
     { id: 'rates', label: t.navRates, icon: TrendingUp },
     { id: 'budgets', label: t.budgetStatus, icon: PieChart },
     { id: 'transactions', label: t.navTransactions, icon: History },
+    { id: 'tools', label: t.navTools, icon: Grid },
     { id: 'settings', label: t.navSettings, icon: Settings },
   ] as const;
 
