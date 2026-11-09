@@ -327,18 +327,63 @@ export function groupTransactionsByDate(
   return Array.from(groupsMap.values());
 }
 
-export type AutoBudgetStrategy = 'saver' | 'balanced' | 'flexible';
+export type AutoBudgetStrategy = 'rule_50_30_20' | 'saver' | 'balanced' | 'flexible';
 
 export interface AutoBudgetSuggestion {
   categoryId: string;
+  budgetGroup: 'needs' | 'wants' | 'savings';
   historicalAvg: number;
   lastMonthSpent: number;
   currentMonthSpent: number;
   activeMonthsCount: number;
   currentLimit: number;
   suggestedLimit: number;
+  shareOfGroupPercent: number;
   txCount: number;
 }
+
+export interface AutoBudgetOptions {
+  customMonthlyIncome?: number;
+  distributeAllCategories?: boolean;
+}
+
+export interface AutoBudget503020Summary {
+  referenceIncome: number;
+  detectedHistoricalIncome: number;
+  isIncomeEstimatedFromExpenses: boolean;
+  needsPool50: number;
+  wantsPool30: number;
+  savingsTarget20: number;
+  suggestedNeedsTotal: number;
+  suggestedWantsTotal: number;
+  historicalNeedsAvg: number;
+  historicalWantsAvg: number;
+  suggestions: AutoBudgetSuggestion[];
+}
+
+// Default benchmark weights within Needs (sum = 100) and Wants (sum = 100)
+const DEFAULT_NEEDS_WEIGHTS: Record<string, number> = {
+  food: 25,
+  housing: 22,
+  groceries: 18,
+  transport: 12,
+  utilities: 10,
+  health: 5,
+  education: 4,
+  family: 2,
+  taxes_fees: 2,
+};
+
+const DEFAULT_WANTS_WEIGHTS: Record<string, number> = {
+  shopping: 24,
+  entertainment: 18,
+  subscription: 14,
+  personal_care: 12,
+  travel: 12,
+  charity: 10,
+  pet: 5,
+  other_expense: 5,
+};
 
 function roundBudgetAmount(amount: number, currency: SupportedCurrency): number {
   if (amount <= 0) return 0;
@@ -354,17 +399,50 @@ function roundBudgetAmount(amount: number, currency: SupportedCurrency): number 
   return Math.ceil(amount / 5) * 5;
 }
 
-export function calculateAutoBudgetSuggestions(
+export function calculateAverageMonthlyIncome(
+  transactions: Transaction[],
+  currentMonthStr: string,
+  ratesFromUsd: Record<SupportedCurrency, number> = FALLBACK_RATES_FROM_USD,
+  targetCurrency: SupportedCurrency = 'IDR'
+): number {
+  const monthTotals = new Map<string, number>();
+
+  transactions.forEach((tx) => {
+    if (tx.type !== 'income' || !tx.date) return;
+    const mKey = tx.date.slice(0, 7);
+    const converted = convertCurrency(tx.amount, tx.currency, targetCurrency, ratesFromUsd);
+    monthTotals.set(mKey, (monthTotals.get(mKey) || 0) + converted);
+  });
+
+  if (monthTotals.size === 0) return 0;
+
+  const pastMonths: number[] = [];
+  monthTotals.forEach((val, mKey) => {
+    if (mKey < currentMonthStr && val > 0) {
+      pastMonths.push(val);
+    }
+  });
+
+  const currentMoIncome = monthTotals.get(currentMonthStr) || 0;
+  if (pastMonths.length > 0 && currentMoIncome > 0) {
+    const all = [...pastMonths, currentMoIncome];
+    return Math.round(all.reduce((a, b) => a + b, 0) / all.length);
+  }
+  if (pastMonths.length > 0) {
+    return Math.round(pastMonths.reduce((a, b) => a + b, 0) / pastMonths.length);
+  }
+  return Math.round(currentMoIncome);
+}
+
+export function calculateAutoBudget503020Summary(
   transactions: Transaction[],
   categories: BudgetCategory[],
   currentMonthStr: string, // YYYY-MM
-  strategy: AutoBudgetStrategy = 'balanced',
+  strategy: AutoBudgetStrategy = 'rule_50_30_20',
   ratesFromUsd: Record<SupportedCurrency, number> = FALLBACK_RATES_FROM_USD,
-  targetCurrency: SupportedCurrency = 'IDR'
-): AutoBudgetSuggestion[] {
-  const multiplier = strategy === 'saver' ? 0.9 : strategy === 'flexible' ? 1.15 : 1.0;
-
-  // Determine previous month string YYYY-MM
+  targetCurrency: SupportedCurrency = 'IDR',
+  options?: AutoBudgetOptions
+): AutoBudget503020Summary {
   const [yr, mo] = currentMonthStr.split('-').map(Number);
   const prevDate = new Date(yr, mo - 2, 1);
   const lastMonthStr = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`;
@@ -388,19 +466,29 @@ export function calculateAutoBudgetSuggestions(
     catTxCounts.set(tx.categoryId, (catTxCounts.get(tx.categoryId) || 0) + 1);
   });
 
-  const suggestions: AutoBudgetSuggestion[] = [];
+  // Compute historical monthly average per category
+  const catStats = new Map<
+    string,
+    {
+      historicalAvg: number;
+      lastMonthSpent: number;
+      currentMonthSpent: number;
+      activeMonthsCount: number;
+      txCount: number;
+    }
+  >();
+
+  let historicalNeedsAvg = 0;
+  let historicalWantsAvg = 0;
 
   expenseCategories.forEach((cat) => {
     const monthMap = catMonthTotals.get(cat.id);
     const txCount = catTxCounts.get(cat.id) || 0;
-    if (!monthMap || txCount === 0) return;
+    const currentMonthSpent = monthMap?.get(currentMonthStr) || 0;
+    const lastMonthSpent = monthMap?.get(lastMonthStr) || 0;
 
-    const currentMonthSpent = monthMap.get(currentMonthStr) || 0;
-    const lastMonthSpent = monthMap.get(lastMonthStr) || 0;
-
-    // Collect past months (< currentMonthStr)
     const pastMonths: number[] = [];
-    monthMap.forEach((val, mKey) => {
+    monthMap?.forEach((val, mKey) => {
       if (mKey < currentMonthStr && val > 0) {
         pastMonths.push(val);
       }
@@ -410,38 +498,214 @@ export function calculateAutoBudgetSuggestions(
     let activeMonthsCount = 0;
 
     if (pastMonths.length > 0 && currentMonthSpent > 0) {
-      // Blend past months and current month if current month exceeds past average, or average all active months
       const allActive = [...pastMonths, currentMonthSpent];
       baseAvg = allActive.reduce((s, v) => s + v, 0) / allActive.length;
       activeMonthsCount = allActive.length;
     } else if (pastMonths.length > 0) {
       baseAvg = pastMonths.reduce((s, v) => s + v, 0) / pastMonths.length;
       activeMonthsCount = pastMonths.length;
-    } else {
-      // Only current month data exists
+    } else if (currentMonthSpent > 0) {
       baseAvg = currentMonthSpent;
       activeMonthsCount = 1;
     }
 
-    const rawSuggested = baseAvg * multiplier;
-    const suggestedLimit = roundBudgetAmount(rawSuggested, targetCurrency);
+    catStats.set(cat.id, {
+      historicalAvg: baseAvg,
+      lastMonthSpent,
+      currentMonthSpent,
+      activeMonthsCount,
+      txCount,
+    });
 
-    if (suggestedLimit > 0) {
-      suggestions.push({
-        categoryId: cat.id,
-        historicalAvg: Math.round(baseAvg),
-        lastMonthSpent: Math.round(lastMonthSpent),
-        currentMonthSpent: Math.round(currentMonthSpent),
-        activeMonthsCount,
-        currentLimit: cat.monthlyLimit || 0,
-        suggestedLimit,
-        txCount,
-      });
+    const group = cat.budgetGroup || 'wants';
+    if (group === 'needs') {
+      historicalNeedsAvg += baseAvg;
+    } else {
+      historicalWantsAvg += baseAvg;
     }
   });
 
-  // Sort by highest suggested limit first
-  suggestions.sort((a, b) => b.suggestedLimit - a.suggestedLimit);
-  return suggestions;
+  // Determine reference monthly income for 50/30/20 calculation
+  const detectedHistoricalIncome = calculateAverageMonthlyIncome(
+    transactions,
+    currentMonthStr,
+    ratesFromUsd,
+    targetCurrency
+  );
+
+  const totalHistoricalExpenseAvg = historicalNeedsAvg + historicalWantsAvg;
+  let referenceIncome = 0;
+  let isIncomeEstimatedFromExpenses = false;
+
+  if (options?.customMonthlyIncome && options.customMonthlyIncome > 0) {
+    referenceIncome = options.customMonthlyIncome;
+  } else if (detectedHistoricalIncome > 0) {
+    referenceIncome = detectedHistoricalIncome;
+  } else if (totalHistoricalExpenseAvg > 0) {
+    // Derive implied monthly income assuming historical expenses represent 80% (50% Needs + 30% Wants)
+    referenceIncome = Math.round(totalHistoricalExpenseAvg / 0.8);
+    isIncomeEstimatedFromExpenses = true;
+  }
+
+  const needsPool50 = Math.round(referenceIncome * 0.5);
+  const wantsPool30 = Math.round(referenceIncome * 0.3);
+  const savingsTarget20 = Math.round(referenceIncome * 0.2);
+
+  const suggestions: AutoBudgetSuggestion[] = [];
+  const distributeAll = Boolean(options?.distributeAllCategories);
+
+  if (strategy === 'rule_50_30_20') {
+    const needsCats = expenseCategories.filter((c) => (c.budgetGroup || 'wants') === 'needs');
+    const wantsCats = expenseCategories.filter((c) => (c.budgetGroup || 'wants') !== 'needs');
+
+    // Helper to allocate a pool (50% Needs or 30% Wants) across categories
+    const allocatePool = (
+      groupCats: BudgetCategory[],
+      poolAmount: number,
+      groupTotalHistAvg: number,
+      defaultWeights: Record<string, number>,
+      groupType: 'needs' | 'wants'
+    ) => {
+      if (poolAmount <= 0) return;
+
+      // Determine weights for each category in this group
+      const weights = new Map<string, number>();
+      let totalWeight = 0;
+
+      const usePureHistory = groupTotalHistAvg > 0 && !distributeAll;
+
+      groupCats.forEach((cat) => {
+        const st = catStats.get(cat.id);
+        const hist = st?.historicalAvg || 0;
+        const defW = defaultWeights[cat.id] || 5;
+
+        let w = 0;
+        if (usePureHistory) {
+          w = hist > 0 ? hist / groupTotalHistAvg : 0;
+        } else if (groupTotalHistAvg > 0 && distributeAll) {
+          // Blend 70% historical share + 30% default benchmark weight so all categories get a sensible allocation
+          const histShare = (hist / groupTotalHistAvg) * 100;
+          w = histShare * 0.7 + defW * 0.3;
+        } else {
+          // No historical transactions in this group yet: use default benchmark weights
+          w = defW;
+        }
+
+        if (w > 0) {
+          weights.set(cat.id, w);
+          totalWeight += w;
+        }
+      });
+
+      if (totalWeight <= 0) return;
+
+      groupCats.forEach((cat) => {
+        const w = weights.get(cat.id) || 0;
+        if (w <= 0) return;
+        const shareRatio = w / totalWeight;
+        const rawTarget = poolAmount * shareRatio;
+        const suggestedLimit = roundBudgetAmount(rawTarget, targetCurrency);
+        const st = catStats.get(cat.id)!;
+
+        if (suggestedLimit > 0) {
+          suggestions.push({
+            categoryId: cat.id,
+            budgetGroup: groupType,
+            historicalAvg: Math.round(st.historicalAvg),
+            lastMonthSpent: Math.round(st.lastMonthSpent),
+            currentMonthSpent: Math.round(st.currentMonthSpent),
+            activeMonthsCount: st.activeMonthsCount,
+            currentLimit: cat.monthlyLimit || 0,
+            suggestedLimit,
+            shareOfGroupPercent: Math.round(shareRatio * 100),
+            txCount: st.txCount,
+          });
+        }
+      });
+    };
+
+    allocatePool(needsCats, needsPool50, historicalNeedsAvg, DEFAULT_NEEDS_WEIGHTS, 'needs');
+    allocatePool(wantsCats, wantsPool30, historicalWantsAvg, DEFAULT_WANTS_WEIGHTS, 'wants');
+  } else {
+    // Historical multiplier strategies: 'saver' (0.9), 'balanced' (1.0), 'flexible' (1.15)
+    const multiplier = strategy === 'saver' ? 0.9 : strategy === 'flexible' ? 1.15 : 1.0;
+
+    expenseCategories.forEach((cat) => {
+      const st = catStats.get(cat.id);
+      if (!st || st.txCount === 0 || st.historicalAvg <= 0) return;
+
+      const groupType: 'needs' | 'wants' = (cat.budgetGroup || 'wants') === 'needs' ? 'needs' : 'wants';
+      const groupHistTotal = groupType === 'needs' ? historicalNeedsAvg : historicalWantsAvg;
+      const sharePct = groupHistTotal > 0 ? Math.round((st.historicalAvg / groupHistTotal) * 100) : 0;
+
+      const rawSuggested = st.historicalAvg * multiplier;
+      const suggestedLimit = roundBudgetAmount(rawSuggested, targetCurrency);
+
+      if (suggestedLimit > 0) {
+        suggestions.push({
+          categoryId: cat.id,
+          budgetGroup: groupType,
+          historicalAvg: Math.round(st.historicalAvg),
+          lastMonthSpent: Math.round(st.lastMonthSpent),
+          currentMonthSpent: Math.round(st.currentMonthSpent),
+          activeMonthsCount: st.activeMonthsCount,
+          currentLimit: cat.monthlyLimit || 0,
+          suggestedLimit,
+          shareOfGroupPercent: sharePct,
+          txCount: st.txCount,
+        });
+      }
+    });
+  }
+
+  // Sort: Needs first, then by highest suggested limit
+  suggestions.sort((a, b) => {
+    if (a.budgetGroup !== b.budgetGroup) {
+      return a.budgetGroup === 'needs' ? -1 : 1;
+    }
+    return b.suggestedLimit - a.suggestedLimit;
+  });
+
+  const suggestedNeedsTotal = suggestions
+    .filter((s) => s.budgetGroup === 'needs')
+    .reduce((sum, s) => sum + s.suggestedLimit, 0);
+  const suggestedWantsTotal = suggestions
+    .filter((s) => s.budgetGroup === 'wants')
+    .reduce((sum, s) => sum + s.suggestedLimit, 0);
+
+  return {
+    referenceIncome: Math.round(referenceIncome),
+    detectedHistoricalIncome,
+    isIncomeEstimatedFromExpenses,
+    needsPool50,
+    wantsPool30,
+    savingsTarget20,
+    suggestedNeedsTotal,
+    suggestedWantsTotal,
+    historicalNeedsAvg: Math.round(historicalNeedsAvg),
+    historicalWantsAvg: Math.round(historicalWantsAvg),
+    suggestions,
+  };
 }
+
+export function calculateAutoBudgetSuggestions(
+  transactions: Transaction[],
+  categories: BudgetCategory[],
+  currentMonthStr: string, // YYYY-MM
+  strategy: AutoBudgetStrategy = 'balanced',
+  ratesFromUsd: Record<SupportedCurrency, number> = FALLBACK_RATES_FROM_USD,
+  targetCurrency: SupportedCurrency = 'IDR',
+  options?: AutoBudgetOptions
+): AutoBudgetSuggestion[] {
+  return calculateAutoBudget503020Summary(
+    transactions,
+    categories,
+    currentMonthStr,
+    strategy,
+    ratesFromUsd,
+    targetCurrency,
+    options
+  ).suggestions;
+}
+
 

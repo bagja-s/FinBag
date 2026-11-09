@@ -9,6 +9,7 @@ import {
   filterTransactionsList,
   groupTransactionsByDate,
   calculateAutoBudgetSuggestions,
+  calculateAutoBudget503020Summary,
 } from './financeCalculations';
 import { WalletAccount, Transaction, BudgetCategory } from '../types/finance';
 
@@ -120,4 +121,27 @@ test('calculateAutoBudgetSuggestions computes suggested budget from historical t
   const flexible = calculateAutoBudgetSuggestions(mockTxs, mockCategories, '2026-11', 'flexible');
   assert.equal(flexible[0].suggestedLimit, 1150000);
 });
+
+test('calculateAutoBudget503020Summary allocates 50% Needs, 30% Wants, and 20% Savings based on monthly income', () => {
+  const mockCategories: BudgetCategory[] = [
+    { id: 'food', name: 'Makanan', nameEn: 'Food', icon: 'Utensils', color: '#F59E0B', monthlyLimit: 0, type: 'expense', budgetGroup: 'needs' },
+    { id: 'utilities', name: 'Tagihan', nameEn: 'Utilities', icon: 'Zap', color: '#8B5CF6', monthlyLimit: 0, type: 'expense', budgetGroup: 'needs' },
+    { id: 'entertainment', name: 'Hiburan', nameEn: 'Entertainment', icon: 'Film', color: '#84CC16', monthlyLimit: 0, type: 'expense', budgetGroup: 'wants' },
+  ];
+  const mockTxs: Transaction[] = [
+    { id: 'i1', date: '2026-10-25', amount: 10000000, currency: 'IDR', type: 'income', categoryId: 'salary', sourceWalletId: 'w1', description: 'Gaji Oktober' },
+    { id: 'e1', date: '2026-10-10', amount: 3000000, currency: 'IDR', type: 'expense', categoryId: 'food', sourceWalletId: 'w1', description: 'Makan' },
+    { id: 'e2', date: '2026-10-12', amount: 1000000, currency: 'IDR', type: 'expense', categoryId: 'utilities', sourceWalletId: 'w1', description: 'Listrik' },
+    { id: 'e3', date: '2026-10-15', amount: 1500000, currency: 'IDR', type: 'expense', categoryId: 'entertainment', sourceWalletId: 'w1', description: 'Nonton' },
+  ];
+
+  const summary = calculateAutoBudget503020Summary(mockTxs, mockCategories, '2026-11', 'rule_50_30_20');
+  assert.equal(summary.referenceIncome, 10000000);
+  assert.equal(summary.needsPool50, 5000000);
+  assert.equal(summary.wantsPool30, 3000000);
+  assert.equal(summary.savingsTarget20, 2000000);
+  assert.equal(summary.suggestedNeedsTotal, 5000000);
+  assert.equal(summary.suggestedWantsTotal, 3000000);
+});
+
 
