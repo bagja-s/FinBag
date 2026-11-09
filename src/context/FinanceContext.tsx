@@ -68,6 +68,7 @@ import {
 import {
   AutoLockTimeoutMinutes,
   PinAttemptState,
+  BiometricConfig,
   hashPinSync,
   isHashedPin,
   verifyPin,
@@ -75,6 +76,10 @@ import {
   sanitizeCsvCell,
   computeBackupChecksum,
   validateAndSanitizeBackupJSON,
+  detectMobilePlatform,
+  shouldRequireBiometricAfterPin,
+  enrollWebAuthnBiometric,
+  verifyWebAuthnBiometric,
 } from '../utils/securityUtils';
 
 interface FinanceContextType {
@@ -111,13 +116,23 @@ interface FinanceContextType {
   theme: 'dark' | 'light';
   toggleTheme: () => void;
 
-  // Security Lock & Privacy
+  // Security Lock, Biometric 2FA & Privacy
   appPin: string | null;
   isAppUnlocked: boolean;
+  isPinVerifiedForSession: boolean;
+  isBiometricStepRequired: boolean;
+  biometricConfig: BiometricConfig | null;
   pinAttemptState: PinAttemptState;
   setAppPin: (pin: string | null) => void;
   verifyCurrentPin: (enteredPin: string) => boolean;
   unlockApp: (enteredPin: string) => boolean;
+  verifyBiometricUnlock: () => Promise<{ success: boolean; error?: string }>;
+  registerBiometric: (options?: {
+    mobileOnly?: boolean;
+    allowFallbackIfRestricted?: boolean;
+  }) => Promise<{ success: boolean; isEnvironmentRestricted?: boolean; error?: string }>;
+  removeBiometric: () => void;
+  setBiometricMobileOnly: (mobileOnly: boolean) => void;
   lockApp: () => void;
   autoLockMinutes: AutoLockTimeoutMinutes;
   setAutoLockMinutes: (minutes: AutoLockTimeoutMinutes) => void;
@@ -223,9 +238,11 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     return (localStorage.getItem(`${LOCAL_STORAGE_PREFIX}theme`) as 'dark' | 'light') || 'dark';
   });
 
-  // Security PIN (per-account, stored as salted hash) & Privacy Mode
+  // Security PIN (per-account, stored as salted hash), Biometric WebAuthn 2FA & Privacy Mode
   const [appPin, setAppPinState] = useState<string | null>(null);
   const [isAppUnlocked, setIsAppUnlocked] = useState<boolean>(true);
+  const [isPinVerifiedForSession, setIsPinVerifiedForSession] = useState<boolean>(false);
+  const [biometricConfig, setBiometricConfigState] = useState<BiometricConfig | null>(null);
   const [pinAttemptState, setPinAttemptState] = useState<PinAttemptState>({
     failedAttempts: 0,
     lockoutUntilMs: null,
@@ -589,16 +606,24 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     localStorage.setItem(`${LOCAL_STORAGE_PREFIX}lock_tab_hidden`, String(enabled));
   };
 
+  const isBiometricStepRequired = shouldRequireBiometricAfterPin(
+    Boolean(appPin),
+    biometricConfig,
+    detectMobilePlatform().isMobile
+  );
+
   const setAppPin = (pin: string | null) => {
     if (!user) {
       setAppPinState(pin ? hashPinSync(pin, 'local_user') : null);
       return;
     }
     const userPinKey = `${LOCAL_STORAGE_PREFIX}pin_${user.uid}`;
+    const userBioKey = `${LOCAL_STORAGE_PREFIX}biometric_${user.uid}`;
     if (pin) {
       const hashed = isHashedPin(pin) ? pin : hashPinSync(pin, user.uid);
       localStorage.setItem(userPinKey, hashed);
       setAppPinState(hashed);
+      setIsPinVerifiedForSession(true);
       setIsAppUnlocked(true);
       setPinAttemptState({ failedAttempts: 0, lockoutUntilMs: null });
       logActivity(
@@ -609,11 +634,69 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
       );
     } else {
       localStorage.removeItem(userPinKey);
+      localStorage.removeItem(userBioKey);
       setAppPinState(null);
+      setBiometricConfigState(null);
+      setIsPinVerifiedForSession(false);
       setIsAppUnlocked(true);
       setPinAttemptState({ failedAttempts: 0, lockoutUntilMs: null });
-      logActivity('DELETE', 'SECURITY', 'Menonaktifkan PIN Keamanan Aplikasi', {});
+      logActivity('DELETE', 'SECURITY', 'Menonaktifkan PIN Keamanan & Lapis Biometrik Aplikasi', {});
     }
+  };
+
+  const registerBiometric = async (options?: {
+    mobileOnly?: boolean;
+    allowFallbackIfRestricted?: boolean;
+  }): Promise<{ success: boolean; isEnvironmentRestricted?: boolean; error?: string }> => {
+    const uid = user?.uid || 'local_user';
+    const result = await enrollWebAuthnBiometric({
+      userId: uid,
+      userEmail: user?.email || 'user@finbag.app',
+      displayName: user?.displayName || 'FinBag User',
+      mobileOnly: options?.mobileOnly ?? true,
+      allowFallbackIfRestricted: options?.allowFallbackIfRestricted ?? false,
+    });
+
+    if (result.success && result.config) {
+      setBiometricConfigState(result.config);
+      localStorage.setItem(
+        `${LOCAL_STORAGE_PREFIX}biometric_${uid}`,
+        JSON.stringify(result.config)
+      );
+      logActivity(
+        'CREATE',
+        'SECURITY',
+        `Mengaktifkan Lapis Ke-2 Biometrik WebAuthn (${result.config.authenticatorLabel}) setelah PIN`,
+        { mobileOnly: result.config.mobileOnly }
+      );
+      return { success: true };
+    }
+
+    return {
+      success: false,
+      isEnvironmentRestricted: result.isEnvironmentRestricted,
+      error: result.error,
+    };
+  };
+
+  const removeBiometric = () => {
+    const uid = user?.uid || 'local_user';
+    localStorage.removeItem(`${LOCAL_STORAGE_PREFIX}biometric_${uid}`);
+    setBiometricConfigState(null);
+    logActivity(
+      'DELETE',
+      'SECURITY',
+      'Menonaktifkan Lapis Ke-2 Biometrik WebAuthn (FaceID / Sidik Jari)',
+      {}
+    );
+  };
+
+  const setBiometricMobileOnly = (mobileOnly: boolean) => {
+    if (!biometricConfig) return;
+    const uid = user?.uid || 'local_user';
+    const updated: BiometricConfig = { ...biometricConfig, mobileOnly };
+    setBiometricConfigState(updated);
+    localStorage.setItem(`${LOCAL_STORAGE_PREFIX}biometric_${uid}`, JSON.stringify(updated));
   };
 
   const verifyCurrentPin = (enteredPin: string): boolean => {
@@ -623,6 +706,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   const unlockApp = (enteredPin: string): boolean => {
     if (!appPin) {
+      setIsPinVerifiedForSession(true);
       setIsAppUnlocked(true);
       return true;
     }
@@ -635,7 +719,12 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     setPinAttemptState(evaluation.nextState);
 
     if (evaluation.success) {
-      setIsAppUnlocked(true);
+      setIsPinVerifiedForSession(true);
+      // If biometric 2nd layer is required after PIN (specifically on mobile or when configured),
+      // keep isAppUnlocked false until Step 2 (Biometric WebAuthn verification) completes.
+      if (!isBiometricStepRequired) {
+        setIsAppUnlocked(true);
+      }
       return true;
     }
 
@@ -650,8 +739,22 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     return false;
   };
 
+  const verifyBiometricUnlock = async (): Promise<{ success: boolean; error?: string }> => {
+    if (!biometricConfig || !biometricConfig.enabled) {
+      setIsAppUnlocked(true);
+      return { success: true };
+    }
+    const res = await verifyWebAuthnBiometric(biometricConfig);
+    if (res.success) {
+      setIsAppUnlocked(true);
+      return { success: true };
+    }
+    return { success: false, error: res.error };
+  };
+
   const lockApp = () => {
     if (appPin) {
+      setIsPinVerifiedForSession(false);
       setIsAppUnlocked(false);
     }
   };
@@ -666,6 +769,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
       if (idleTimer) clearTimeout(idleTimer);
       if (autoLockMinutes > 0) {
         idleTimer = setTimeout(() => {
+          setIsPinVerifiedForSession(false);
           setIsAppUnlocked(false);
         }, autoLockMinutes * 60 * 1000);
       }
@@ -673,6 +777,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'hidden' && lockOnTabHidden) {
+        setIsPinVerifiedForSession(false);
         setIsAppUnlocked(false);
       } else if (document.visibilityState === 'visible') {
         resetIdleTimer();
@@ -754,7 +859,21 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
       localStorage.setItem(userPinKey, savedPin);
     }
     setAppPinState(savedPin);
+    setIsPinVerifiedForSession(!savedPin);
     setIsAppUnlocked(!savedPin); // Lock if PIN exists
+
+    // Load account-specific Biometric WebAuthn configuration
+    const userBioKey = `${LOCAL_STORAGE_PREFIX}biometric_${userId}`;
+    const savedBioRaw = localStorage.getItem(userBioKey);
+    if (savedBioRaw) {
+      try {
+        setBiometricConfigState(JSON.parse(savedBioRaw) as BiometricConfig);
+      } catch {
+        setBiometricConfigState(null);
+      }
+    } else {
+      setBiometricConfigState(null);
+    }
 
     // Synchronize user profile in Firestore
     const userDocRef = doc(db, 'users', userId);
@@ -2262,10 +2381,17 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
         toggleTheme,
         appPin,
         isAppUnlocked,
+        isPinVerifiedForSession,
+        isBiometricStepRequired,
+        biometricConfig,
         pinAttemptState,
         setAppPin,
         verifyCurrentPin,
         unlockApp,
+        verifyBiometricUnlock,
+        registerBiometric,
+        removeBiometric,
+        setBiometricMobileOnly,
         lockApp,
         autoLockMinutes,
         setAutoLockMinutes,

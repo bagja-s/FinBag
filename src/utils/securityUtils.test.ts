@@ -9,6 +9,13 @@ import {
   computeBackupChecksum,
   validateAndSanitizeBackupJSON,
   calculateSecurityHealthScore,
+  uint8ArrayToBase64Url,
+  base64UrlToUint8Array,
+  detectMobilePlatform,
+  shouldRequireBiometricAfterPin,
+  buildWebAuthnRegistrationOptions,
+  buildWebAuthnAssertionOptions,
+  BiometricConfig,
 } from './securityUtils';
 
 test('hashPinSync produces deterministic 72-char salted hash and verifyPin validates both hashed and legacy PINs', () => {
@@ -103,24 +110,93 @@ test('validateAndSanitizeBackupJSON verifies checksums and rejects tampered or m
   assert.ok(tamperedResult.error?.includes('Checksum'));
 });
 
-test('calculateSecurityHealthScore computes 0-100 score based on active protections', () => {
+test('calculateSecurityHealthScore computes 0-100 score including WebAuthn Biometric 2FA layer', () => {
   const full = calculateSecurityHealthScore({
     isAuthenticated: true,
     isEmailVerified: true,
     hasPinEnabled: true,
+    hasBiometricEnabled: true,
     autoLockMinutes: 5,
     lockOnTabHidden: true,
   });
   assert.equal(full.score, 100);
   assert.equal(full.level, 'strong');
 
+  const pinOnlyWithTimers = calculateSecurityHealthScore({
+    isAuthenticated: true,
+    isEmailVerified: true,
+    hasPinEnabled: true,
+    hasBiometricEnabled: false,
+    autoLockMinutes: 5,
+    lockOnTabHidden: true,
+  });
+  assert.equal(pinOnlyWithTimers.score, 80);
+  assert.equal(pinOnlyWithTimers.level, 'strong');
+
   const basic = calculateSecurityHealthScore({
     isAuthenticated: true,
     isEmailVerified: true,
     hasPinEnabled: false,
+    hasBiometricEnabled: false,
     autoLockMinutes: 0,
     lockOnTabHidden: false,
   });
-  assert.equal(basic.score, 30);
+  assert.equal(basic.score, 25);
   assert.equal(basic.level, 'basic');
 });
+
+test('WebAuthn Base64URL encoding, mobile platform detection, and 2-step PIN+Biometric enforcement work accurately', () => {
+  const sampleBytes = new Uint8Array([1, 2, 3, 250, 251, 252, 253, 254, 255]);
+  const encoded = uint8ArrayToBase64Url(sampleBytes);
+  assert.ok(!encoded.includes('+'));
+  assert.ok(!encoded.includes('/'));
+  assert.ok(!encoded.includes('='));
+  const decoded = base64UrlToUint8Array(encoded);
+  assert.deepEqual(Array.from(decoded), Array.from(sampleBytes));
+
+  // Mobile detection for iOS (FaceID/TouchID) and Android (Fingerprint/Face Unlock)
+  const ios = detectMobilePlatform('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)', 5, 390);
+  assert.equal(ios.isMobile, true);
+  assert.equal(ios.os, 'ios');
+  assert.ok(ios.biometricLabelId.includes('FaceID'));
+
+  const android = detectMobilePlatform('Mozilla/5.0 (Linux; Android 14; Pixel 8)', 5, 412);
+  assert.equal(android.isMobile, true);
+  assert.equal(android.os, 'android');
+  assert.ok(android.biometricLabelId.includes('Sidik Jari'));
+
+  const desktop = detectMobilePlatform('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)', 0, 1440);
+  assert.equal(desktop.isMobile, false);
+
+  // 2-Step PIN + Biometric requirement check
+  const mobileBioConfig: BiometricConfig = {
+    enabled: true,
+    credentialId: encoded,
+    registeredAt: '2026-11-09T10:00:00Z',
+    deviceType: 'mobile',
+    mobileOnly: true,
+    authenticatorLabel: 'FaceID / TouchID (iOS)',
+  };
+
+  assert.equal(shouldRequireBiometricAfterPin(true, mobileBioConfig, true), true);
+  assert.equal(shouldRequireBiometricAfterPin(true, mobileBioConfig, false), false);
+  assert.equal(shouldRequireBiometricAfterPin(false, mobileBioConfig, true), false);
+
+  // Verify WebAuthn options structure
+  const regOpts = buildWebAuthnRegistrationOptions({
+    userId: 'uid_123',
+    userEmail: 'sm.bagja@gmail.com',
+    displayName: 'Bagja',
+    challengeBytes: new Uint8Array(32),
+  });
+  assert.equal(regOpts.authenticatorSelection?.authenticatorAttachment, 'platform');
+  assert.equal(regOpts.authenticatorSelection?.userVerification, 'required');
+
+  const assertOpts = buildWebAuthnAssertionOptions({
+    credentialId: encoded,
+    challengeBytes: new Uint8Array(32),
+  });
+  assert.equal(assertOpts.userVerification, 'required');
+  assert.equal(assertOpts.allowCredentials?.length, 1);
+});
+

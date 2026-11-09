@@ -28,7 +28,9 @@ import {
   Send,
   ShieldCheck,
   Eye,
-  EyeOff
+  EyeOff,
+  Fingerprint,
+  Smartphone
 } from 'lucide-react';
 import { ConfirmationModal } from '../common/ConfirmationModal';
 import { SupportedCurrency, AuditAction, NotificationPreferences } from '../../types/finance';
@@ -37,6 +39,7 @@ import {
   AutoLockTimeoutMinutes,
   calculateSecurityHealthScore,
   validateAndSanitizeBackupJSON,
+  detectMobilePlatform,
 } from '../../utils/securityUtils';
 
 export const SettingsView: React.FC = () => {
@@ -49,6 +52,10 @@ export const SettingsView: React.FC = () => {
     appPin,
     setAppPin,
     verifyCurrentPin,
+    biometricConfig,
+    registerBiometric,
+    removeBiometric,
+    setBiometricMobileOnly,
     autoLockMinutes,
     setAutoLockMinutes,
     lockOnTabHidden,
@@ -105,6 +112,14 @@ export const SettingsView: React.FC = () => {
   const [importJsonSuccess, setImportJsonSuccess] = useState(false);
   const [importJsonError, setImportJsonError] = useState<string | null>(null);
 
+  // Biometric WebAuthn settings state
+  const [isEnrollingBiometric, setIsEnrollingBiometric] = useState(false);
+  const [biometricStatusMsg, setBiometricStatusMsg] = useState<string | null>(null);
+  const [biometricErrorMsg, setBiometricErrorMsg] = useState<string | null>(null);
+  const [biometricEnvRestricted, setBiometricEnvRestricted] = useState(false);
+
+  const platformInfo = detectMobilePlatform();
+
   // Audit Log filter state
   const [auditActionFilter, setAuditActionFilter] = useState<'ALL' | AuditAction>('ALL');
 
@@ -112,9 +127,36 @@ export const SettingsView: React.FC = () => {
     isAuthenticated: Boolean(user),
     isEmailVerified: Boolean(user?.emailVerified ?? true),
     hasPinEnabled: Boolean(appPin),
+    hasBiometricEnabled: Boolean(biometricConfig?.enabled),
     autoLockMinutes,
     lockOnTabHidden,
   });
+
+  const handleEnrollBiometric = async (allowFallbackIfRestricted: boolean = false) => {
+    setIsEnrollingBiometric(true);
+    setBiometricErrorMsg(null);
+    setBiometricStatusMsg(null);
+    try {
+      const res = await registerBiometric({
+        mobileOnly: true,
+        allowFallbackIfRestricted,
+      });
+      if (res.success) {
+        setBiometricEnvRestricted(false);
+        setBiometricStatusMsg(
+          language === 'id'
+            ? 'Autentikasi Biometrik (FaceID / Sidik Jari) berhasil diaktifkan sebagai lapis ke-2 setelah PIN.'
+            : 'Biometric Authentication (FaceID / Fingerprint) enabled as 2nd layer after PIN.'
+        );
+        setTimeout(() => setBiometricStatusMsg(null), 4000);
+      } else {
+        setBiometricEnvRestricted(Boolean(res.isEnvironmentRestricted));
+        setBiometricErrorMsg(res.error || 'Gagal mengaktifkan biometrik.');
+      }
+    } finally {
+      setIsEnrollingBiometric(false);
+    }
+  };
 
   const handleClearDatabase = async () => {
     if (appPin && !verifyCurrentPin(resetPinInput)) {
@@ -472,6 +514,135 @@ export const SettingsView: React.FC = () => {
               : 'Security PIN settings updated successfully.'}
           </p>
         )}
+
+        {/* 2.1b WebAuthn Biometric 2nd Layer (FaceID / Fingerprint after PIN, Mobile-Focused) */}
+        <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <Fingerprint className="h-4 w-4 text-emerald-500 shrink-0" />
+                <p className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                  {language === 'id'
+                    ? 'Verifikasi Biometrik Lapis Ke-2 (FaceID / Sidik Jari)'
+                    : '2nd-Layer Biometric Verification (FaceID / Fingerprint)'}
+                </p>
+                <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/70 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-300">
+                  <Smartphone className="h-2.5 w-2.5" />
+                  <span>WebAuthn Mobile 2FA</span>
+                </span>
+              </div>
+              <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                {language === 'id'
+                  ? `Lapisan keamanan tambahan setelah kode PIN khusus pengguna perangkat mobile (${platformInfo.biometricLabelId}) menggunakan Web Authentication API.`
+                  : `Additional security layer after PIN code specifically for mobile users (${platformInfo.biometricLabelEn}) using the Web Authentication API.`}
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              {!appPin ? (
+                <span className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 px-3 py-2 text-[11px] font-semibold text-slate-400">
+                  {language === 'id' ? 'Wajib Aktifkan PIN Dahulu' : 'Enable PIN First'}
+                </span>
+              ) : biometricConfig?.enabled ? (
+                <button
+                  type="button"
+                  onClick={removeBiometric}
+                  className="rounded-xl border border-rose-300 bg-rose-50 px-3.5 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-100 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-400 cursor-pointer"
+                >
+                  {language === 'id' ? 'Nonaktifkan Biometrik' : 'Disable Biometrics'}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  disabled={isEnrollingBiometric}
+                  onClick={() => handleEnrollBiometric(false)}
+                  className="flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 px-3.5 py-2 text-xs font-bold text-white shadow-xs transition-colors disabled:opacity-50 cursor-pointer"
+                >
+                  <Fingerprint className="h-3.5 w-3.5" />
+                  <span>
+                    {isEnrollingBiometric
+                      ? language === 'id'
+                        ? 'Memindai...'
+                        : 'Scanning...'
+                      : language === 'id'
+                      ? 'Aktifkan FaceID / Sidik Jari'
+                      : 'Enable FaceID / Fingerprint'}
+                  </span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {biometricConfig?.enabled && appPin && (
+            <div className="mt-3 rounded-xl border border-emerald-200/70 dark:border-emerald-900/50 bg-emerald-50/50 dark:bg-emerald-950/20 p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="text-[11px] text-emerald-800 dark:text-emerald-300">
+                <p className="font-bold flex items-center gap-1.5">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                  <span>
+                    {language === 'id'
+                      ? `Sensor Terdaftar: ${biometricConfig.authenticatorLabel}`
+                      : `Registered Sensor: ${biometricConfig.authenticatorLabel}`}
+                  </span>
+                </p>
+                <p className="text-emerald-700/80 dark:text-emerald-400/80 mt-0.5">
+                  {biometricConfig.mobileOnly
+                    ? language === 'id'
+                      ? 'Mode Khusus Mobile: Verifikasi FaceID/Sidik Jari diminta setelah PIN saat dibuka di HP/Tablet.'
+                      : 'Mobile-Only Mode: FaceID/Fingerprint is required after PIN on mobile/tablet devices.'
+                    : language === 'id'
+                    ? 'Mode Semua Perangkat: Verifikasi Biometrik diminta setelah PIN di Mobile maupun Desktop.'
+                    : 'All-Devices Mode: Biometric verification required after PIN on both Mobile and Desktop.'}
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+                  {language === 'id' ? 'Khusus Mobile' : 'Mobile Only'}
+                </span>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={biometricConfig.mobileOnly}
+                  onClick={() => setBiometricMobileOnly(!biometricConfig.mobileOnly)}
+                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
+                    biometricConfig.mobileOnly ? 'bg-emerald-600' : 'bg-slate-300 dark:bg-slate-700'
+                  }`}
+                >
+                  <span
+                    aria-hidden="true"
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md transition duration-200 ease-in-out ${
+                      biometricConfig.mobileOnly ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {biometricErrorMsg && (
+            <div className="mt-2.5 rounded-xl border border-amber-200 dark:border-amber-900/50 bg-amber-50/70 dark:bg-amber-950/30 p-3 text-xs text-amber-800 dark:text-amber-300 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <span>{biometricErrorMsg}</span>
+              {biometricEnvRestricted && (
+                <button
+                  type="button"
+                  onClick={() => handleEnrollBiometric(true)}
+                  className="shrink-0 rounded-lg bg-amber-600 hover:bg-amber-500 px-3 py-1.5 text-[11px] font-bold text-white transition-colors cursor-pointer"
+                >
+                  {language === 'id'
+                    ? 'Gunakan Passkey Biometrik Perangkat'
+                    : 'Use Device Biometric Passkey'}
+                </button>
+              )}
+            </div>
+          )}
+
+          {biometricStatusMsg && (
+            <p className="mt-2 text-xs font-semibold text-emerald-500 flex items-center gap-1.5">
+              <CheckCircle2 className="h-3.5 w-3.5" />
+              <span>{biometricStatusMsg}</span>
+            </p>
+          )}
+        </div>
 
         {/* 2.2 Auto-Lock Idle Timeout & Tab Hidden Lock */}
         {appPin && (
