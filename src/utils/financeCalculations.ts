@@ -4,17 +4,37 @@ import {
   Transaction, 
   BudgetCategory,
   RecurringFrequency,
-  RecurringTransaction
+  RecurringTransaction,
+  SavingsGoal,
+  DebtRecord
 } from '../types/finance';
 import { CURRENCY_METADATA, FALLBACK_RATES_FROM_USD, convertCurrency } from '../services/currencyService';
+
+let globalPrivacyMask = false;
+
+export function setGlobalPrivacyMask(masked: boolean): void {
+  globalPrivacyMask = masked;
+}
+
+export function isGlobalPrivacyMaskEnabled(): boolean {
+  return globalPrivacyMask;
+}
 
 export function formatCurrency(
   amount: number, 
   currency: SupportedCurrency = 'IDR',
-  showSymbol: boolean = true
+  showSymbol: boolean = true,
+  forceUnmasked: boolean = false
 ): string {
   const meta = CURRENCY_METADATA[currency] || CURRENCY_METADATA.IDR;
   const isNegative = amount < 0;
+  const sign = isNegative ? '-' : '';
+
+  if (globalPrivacyMask && !forceUnmasked) {
+    if (!showSymbol) return '•••••••';
+    return currency === 'IDR' ? `${sign}Rp •••••••` : `${sign}${meta.symbol}••••••`;
+  }
+
   const absAmount = Math.abs(amount);
 
   let formattedNumber: string;
@@ -27,7 +47,6 @@ export function formatCurrency(
     });
   }
 
-  const sign = isNegative ? '-' : '';
   if (!showSymbol) {
     return `${sign}${formattedNumber}`;
   }
@@ -829,6 +848,261 @@ export function calculateMonthlyRecurringSummary(
     monthlyIncomeEstimate: Math.round(monthlyIncomeEstimate),
   };
 }
+
+export type DatePeriodPreset = 'all' | 'this_month' | 'last_month' | 'last_30_days' | 'custom';
+
+export function getDatePeriodRange(
+  preset: DatePeriodPreset,
+  todayStr: string = new Date().toISOString().split('T')[0],
+  customStart?: string,
+  customEnd?: string
+): { startDate?: string; endDate?: string } {
+  if (preset === 'all') {
+    return {};
+  }
+  if (preset === 'custom') {
+    return {
+      startDate: customStart || undefined,
+      endDate: customEnd || undefined,
+    };
+  }
+
+  const [yr, mo, dy] = todayStr.split('-').map(Number);
+
+  if (preset === 'this_month') {
+    const startDate = `${yr}-${String(mo).padStart(2, '0')}-01`;
+    const lastDay = new Date(Date.UTC(yr, mo, 0)).getUTCDate();
+    const endDate = `${yr}-${String(mo).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+    return { startDate, endDate };
+  }
+
+  if (preset === 'last_month') {
+    const prev = new Date(Date.UTC(yr, mo - 2, 1));
+    const prevYr = prev.getUTCFullYear();
+    const prevMo = prev.getUTCMonth() + 1;
+    const lastDay = new Date(Date.UTC(prevYr, prevMo, 0)).getUTCDate();
+    return {
+      startDate: `${prevYr}-${String(prevMo).padStart(2, '0')}-01`,
+      endDate: `${prevYr}-${String(prevMo).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`,
+    };
+  }
+
+  // last_30_days
+  const d30 = new Date(Date.UTC(yr, mo - 1, dy - 29));
+  return {
+    startDate: d30.toISOString().split('T')[0],
+    endDate: todayStr,
+  };
+}
+
+export interface FilteredTransactionsSummary {
+  totalIncome: number;
+  totalExpense: number;
+  netCashFlow: number;
+  transferVolume: number;
+  count: number;
+}
+
+export function calculateFilteredTransactionsSummary(
+  transactions: Transaction[],
+  ratesFromUsd: Record<SupportedCurrency, number> = FALLBACK_RATES_FROM_USD,
+  targetCurrency: SupportedCurrency = 'IDR'
+): FilteredTransactionsSummary {
+  let totalIncome = 0;
+  let totalExpense = 0;
+  let transferVolume = 0;
+
+  transactions.forEach((tx) => {
+    const converted = convertCurrency(tx.amount, tx.currency, targetCurrency, ratesFromUsd);
+    if (tx.type === 'income') {
+      totalIncome += converted;
+    } else if (tx.type === 'expense') {
+      totalExpense += converted;
+    } else if (tx.type === 'transfer') {
+      transferVolume += converted;
+    }
+  });
+
+  return {
+    totalIncome: Math.round(totalIncome),
+    totalExpense: Math.round(totalExpense),
+    netCashFlow: Math.round(totalIncome - totalExpense),
+    transferVolume: Math.round(transferVolume),
+    count: transactions.length,
+  };
+}
+
+export interface MonthlyCashFlowTrendPoint {
+  monthKey: string; // YYYY-MM
+  shortLabel: string;
+  fullLabel: string;
+  income: number;
+  expense: number;
+  netSavings: number;
+  savingsRatePercent: number;
+}
+
+export function calculateSixMonthCashFlowTrend(
+  transactions: Transaction[],
+  referenceMonthStr: string, // YYYY-MM
+  ratesFromUsd: Record<SupportedCurrency, number> = FALLBACK_RATES_FROM_USD,
+  targetCurrency: SupportedCurrency = 'IDR',
+  locale: 'id-ID' | 'en-US' = 'id-ID'
+): MonthlyCashFlowTrendPoint[] {
+  const [yr, mo] = referenceMonthStr.split('-').map(Number);
+  const points: MonthlyCashFlowTrendPoint[] = [];
+
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(yr, mo - 1 - i, 1);
+    const mKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    const shortLabel = d.toLocaleDateString(locale, { month: 'short', year: '2-digit' });
+    const fullLabel = d.toLocaleDateString(locale, { month: 'long', year: 'numeric' });
+    const cf = calculateMonthlyCashFlow(transactions, mKey, ratesFromUsd, targetCurrency);
+    const netSavings = cf.income - cf.expense;
+    const savingsRatePercent =
+      cf.income > 0 ? Math.max(-100, Math.min(100, Math.round((netSavings / cf.income) * 100))) : 0;
+
+    points.push({
+      monthKey: mKey,
+      shortLabel,
+      fullLabel,
+      income: Math.round(cf.income),
+      expense: Math.round(cf.expense),
+      netSavings: Math.round(netSavings),
+      savingsRatePercent,
+    });
+  }
+
+  return points;
+}
+
+export interface UpcomingRecurringBillItem {
+  rule: RecurringTransaction;
+  daysUntilDue: number;
+  amountInBase: number;
+  walletBalance: number;
+  isBalanceSufficient: boolean;
+}
+
+export function getUpcomingRecurringBills(
+  recurringList: RecurringTransaction[],
+  wallets: WalletAccount[],
+  todayStr: string = new Date().toISOString().split('T')[0],
+  withinDays: number = 7,
+  ratesFromUsd: Record<SupportedCurrency, number> = FALLBACK_RATES_FROM_USD,
+  targetCurrency: SupportedCurrency = 'IDR'
+): UpcomingRecurringBillItem[] {
+  if (!todayStr || !/^\d{4}-\d{2}-\d{2}$/.test(todayStr)) return [];
+  const [tYr, tMo, tDy] = todayStr.split('-').map(Number);
+  const todayUtcMs = Date.UTC(tYr, tMo - 1, tDy);
+
+  const items: UpcomingRecurringBillItem[] = [];
+
+  recurringList.forEach((rule) => {
+    if (!rule.active || !rule.nextRunDate || !/^\d{4}-\d{2}-\d{2}$/.test(rule.nextRunDate)) return;
+    if (rule.endDate && rule.nextRunDate > rule.endDate) return;
+
+    const [rYr, rMo, rDy] = rule.nextRunDate.split('-').map(Number);
+    const runUtcMs = Date.UTC(rYr, rMo - 1, rDy);
+    const diffDays = Math.round((runUtcMs - todayUtcMs) / (1000 * 60 * 60 * 24));
+
+    if (diffDays <= withinDays) {
+      const wallet = wallets.find((w) => w.id === rule.sourceWalletId);
+      const walletBalance = wallet ? wallet.balance : 0;
+      const isBalanceSufficient =
+        rule.type === 'income' ? true : wallet ? wallet.balance >= rule.amount : false;
+      const amountInBase = Math.round(
+        convertCurrency(rule.amount, rule.currency, targetCurrency, ratesFromUsd)
+      );
+
+      items.push({
+        rule,
+        daysUntilDue: diffDays,
+        amountInBase,
+        walletBalance,
+        isBalanceSufficient,
+      });
+    }
+  });
+
+  return items.sort((a, b) => a.daysUntilDue - b.daysUntilDue);
+}
+
+export interface GoalProgressEta {
+  percentage: number;
+  remainingAmount: number;
+  estimatedMonths: number | null; // null if already achieved or monthlyContribution <= 0
+}
+
+export function calculateGoalProgressAndEta(
+  goal: SavingsGoal,
+  monthlySavingsCapacityInBase: number,
+  ratesFromUsd: Record<SupportedCurrency, number> = FALLBACK_RATES_FROM_USD,
+  baseCurrency: SupportedCurrency = 'IDR'
+): GoalProgressEta {
+  const safeTarget = Math.max(1, goal.targetAmount);
+  const percentage = Math.min(100, Math.round((goal.currentAmount / safeTarget) * 100));
+  const remainingAmount = Math.max(0, goal.targetAmount - goal.currentAmount);
+
+  if (remainingAmount <= 0) {
+    return { percentage: 100, remainingAmount: 0, estimatedMonths: 0 };
+  }
+
+  const capacityInGoalCurr = convertCurrency(
+    monthlySavingsCapacityInBase,
+    baseCurrency,
+    goal.currency,
+    ratesFromUsd
+  );
+
+  if (capacityInGoalCurr <= 0) {
+    return { percentage, remainingAmount, estimatedMonths: null };
+  }
+
+  const estimatedMonths = Math.max(1, Math.ceil(remainingAmount / capacityInGoalCurr));
+  return { percentage, remainingAmount, estimatedMonths };
+}
+
+export interface DebtSummary {
+  totalPayable: number;
+  totalReceivable: number;
+  netPosition: number;
+  unpaidPayableCount: number;
+  unpaidReceivableCount: number;
+}
+
+export function calculateDebtSummary(
+  debts: DebtRecord[],
+  ratesFromUsd: Record<SupportedCurrency, number> = FALLBACK_RATES_FROM_USD,
+  targetCurrency: SupportedCurrency = 'IDR'
+): DebtSummary {
+  let totalPayable = 0;
+  let totalReceivable = 0;
+  let unpaidPayableCount = 0;
+  let unpaidReceivableCount = 0;
+
+  debts.forEach((d) => {
+    if (d.status === 'settled') return;
+    const remaining = Math.max(0, d.amount - (d.paidAmount || 0));
+    const inTarget = convertCurrency(remaining, d.currency, targetCurrency, ratesFromUsd);
+    if (d.type === 'payable') {
+      totalPayable += inTarget;
+      unpaidPayableCount += 1;
+    } else {
+      totalReceivable += inTarget;
+      unpaidReceivableCount += 1;
+    }
+  });
+
+  return {
+    totalPayable: Math.round(totalPayable),
+    totalReceivable: Math.round(totalReceivable),
+    netPosition: Math.round(totalReceivable - totalPayable),
+    unpaidPayableCount,
+    unpaidReceivableCount,
+  };
+}
+
 
 
 

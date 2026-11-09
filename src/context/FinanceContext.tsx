@@ -7,6 +7,7 @@ import {
   RecurringTransaction,
   BudgetCategory, 
   SavingsGoal,
+  DebtRecord,
   UserProfile,
   AuditAction,
   AuditEntity,
@@ -59,10 +60,22 @@ import {
 } from '../services/notificationService';
 import { 
   formatCurrency, 
+  setGlobalPrivacyMask,
   sortTransactionsNewestFirst, 
   calculateNextRecurringDate, 
   getDueRecurringOccurrences 
 } from '../utils/financeCalculations';
+import {
+  AutoLockTimeoutMinutes,
+  PinAttemptState,
+  hashPinSync,
+  isHashedPin,
+  verifyPin,
+  evaluatePinAttempt,
+  sanitizeCsvCell,
+  computeBackupChecksum,
+  validateAndSanitizeBackupJSON,
+} from '../utils/securityUtils';
 
 interface FinanceContextType {
   // User & Auth
@@ -98,12 +111,20 @@ interface FinanceContextType {
   theme: 'dark' | 'light';
   toggleTheme: () => void;
 
-  // Security Lock
+  // Security Lock & Privacy
   appPin: string | null;
   isAppUnlocked: boolean;
+  pinAttemptState: PinAttemptState;
   setAppPin: (pin: string | null) => void;
+  verifyCurrentPin: (enteredPin: string) => boolean;
   unlockApp: (enteredPin: string) => boolean;
   lockApp: () => void;
+  autoLockMinutes: AutoLockTimeoutMinutes;
+  setAutoLockMinutes: (minutes: AutoLockTimeoutMinutes) => void;
+  lockOnTabHidden: boolean;
+  setLockOnTabHidden: (enabled: boolean) => void;
+  isPrivacyMode: boolean;
+  togglePrivacyMode: () => void;
 
   // Navigation & Modals
   activeTab: 'dashboard' | 'wallets' | 'rates' | 'tools' | 'budgets' | 'transactions' | 'admin' | 'settings';
@@ -140,6 +161,7 @@ interface FinanceContextType {
   recurringTransactions: RecurringTransaction[];
   categories: BudgetCategory[];
   goals: SavingsGoal[];
+  debts: DebtRecord[];
   exchangeRates: RatesData;
   isRatesLoading: boolean;
   refreshExchangeRates: () => Promise<void>;
@@ -162,6 +184,10 @@ interface FinanceContextType {
   batchUpdateBudgetLimits: (limitsMap: Record<string, number>) => Promise<void>;
   addGoal: (goal: Omit<SavingsGoal, 'id' | 'currentAmount'>) => Promise<void>;
   contributeToGoal: (goalId: string, walletId: string, amount: number) => Promise<void>;
+  deleteGoal: (goalId: string) => Promise<void>;
+  addDebt: (debt: Omit<DebtRecord, 'id' | 'status' | 'paidAmount' | 'userId' | 'createdAt'>) => Promise<void>;
+  settleDebt: (debtId: string, walletId: string) => Promise<void>;
+  deleteDebt: (debtId: string) => Promise<void>;
 
   // Audit Logs
   auditLogs: AuditLogEntry[];
@@ -197,9 +223,25 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     return (localStorage.getItem(`${LOCAL_STORAGE_PREFIX}theme`) as 'dark' | 'light') || 'dark';
   });
 
-  // Security PIN (per-account, loaded after user auth)
+  // Security PIN (per-account, stored as salted hash) & Privacy Mode
   const [appPin, setAppPinState] = useState<string | null>(null);
   const [isAppUnlocked, setIsAppUnlocked] = useState<boolean>(true);
+  const [pinAttemptState, setPinAttemptState] = useState<PinAttemptState>({
+    failedAttempts: 0,
+    lockoutUntilMs: null,
+  });
+  const [autoLockMinutes, setAutoLockMinutesState] = useState<AutoLockTimeoutMinutes>(() => {
+    const saved = Number(localStorage.getItem(`${LOCAL_STORAGE_PREFIX}autolock_min`) || '5');
+    return ([0, 1, 5, 15, 30].includes(saved) ? saved : 5) as AutoLockTimeoutMinutes;
+  });
+  const [lockOnTabHidden, setLockOnTabHiddenState] = useState<boolean>(() => {
+    return localStorage.getItem(`${LOCAL_STORAGE_PREFIX}lock_tab_hidden`) === 'true';
+  });
+  const [isPrivacyMode, setIsPrivacyMode] = useState<boolean>(() => {
+    const saved = localStorage.getItem(`${LOCAL_STORAGE_PREFIX}privacy_mode`) === 'true';
+    setGlobalPrivacyMask(saved);
+    return saved;
+  });
 
   // Push Notifications state
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermissionStatus>(() => {
@@ -393,6 +435,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     }
   });
   const [goals, setGoals] = useState<SavingsGoal[]>([]);
+  const [debts, setDebts] = useState<DebtRecord[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
 
   // Purge any legacy dummy data from localStorage
@@ -526,24 +569,83 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     }
   }, [announcementExpiry]);
 
-  // PIN Lock handlers
+  // Security & Privacy handlers
+  const togglePrivacyMode = () => {
+    setIsPrivacyMode((prev) => {
+      const next = !prev;
+      setGlobalPrivacyMask(next);
+      localStorage.setItem(`${LOCAL_STORAGE_PREFIX}privacy_mode`, String(next));
+      return next;
+    });
+  };
+
+  const setAutoLockMinutes = (minutes: AutoLockTimeoutMinutes) => {
+    setAutoLockMinutesState(minutes);
+    localStorage.setItem(`${LOCAL_STORAGE_PREFIX}autolock_min`, String(minutes));
+  };
+
+  const setLockOnTabHidden = (enabled: boolean) => {
+    setLockOnTabHiddenState(enabled);
+    localStorage.setItem(`${LOCAL_STORAGE_PREFIX}lock_tab_hidden`, String(enabled));
+  };
+
   const setAppPin = (pin: string | null) => {
-    setAppPinState(pin);
-    if (!user) return;
+    if (!user) {
+      setAppPinState(pin ? hashPinSync(pin, 'local_user') : null);
+      return;
+    }
     const userPinKey = `${LOCAL_STORAGE_PREFIX}pin_${user.uid}`;
     if (pin) {
-      localStorage.setItem(userPinKey, pin);
+      const hashed = isHashedPin(pin) ? pin : hashPinSync(pin, user.uid);
+      localStorage.setItem(userPinKey, hashed);
+      setAppPinState(hashed);
       setIsAppUnlocked(true);
+      setPinAttemptState({ failedAttempts: 0, lockoutUntilMs: null });
+      logActivity(
+        'UPDATE',
+        'SECURITY',
+        'Mengaktifkan / memperbarui PIN Keamanan Aplikasi (Salted SHA-256)',
+        { autoLockMinutes }
+      );
     } else {
       localStorage.removeItem(userPinKey);
+      setAppPinState(null);
       setIsAppUnlocked(true);
+      setPinAttemptState({ failedAttempts: 0, lockoutUntilMs: null });
+      logActivity('DELETE', 'SECURITY', 'Menonaktifkan PIN Keamanan Aplikasi', {});
     }
   };
 
+  const verifyCurrentPin = (enteredPin: string): boolean => {
+    if (!appPin) return true;
+    return verifyPin(enteredPin, appPin, user?.uid || 'local_user');
+  };
+
   const unlockApp = (enteredPin: string): boolean => {
-    if (!appPin || enteredPin === appPin) {
+    if (!appPin) {
       setIsAppUnlocked(true);
       return true;
+    }
+    const evaluation = evaluatePinAttempt(
+      enteredPin,
+      appPin,
+      user?.uid || 'local_user',
+      pinAttemptState
+    );
+    setPinAttemptState(evaluation.nextState);
+
+    if (evaluation.success) {
+      setIsAppUnlocked(true);
+      return true;
+    }
+
+    if (evaluation.isLockedOut && evaluation.nextState.failedAttempts === 5) {
+      logActivity(
+        'UPDATE',
+        'SECURITY',
+        'Peringatan Keamanan: Percobaan PIN gagal 5x berturut-turut (Kunci Cooldown 30 detik aktif)',
+        { failedAttempts: evaluation.nextState.failedAttempts }
+      );
     }
     return false;
   };
@@ -553,6 +655,41 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
       setIsAppUnlocked(false);
     }
   };
+
+  // Auto-Lock on Inactivity & Tab Visibility Change
+  useEffect(() => {
+    if (!appPin || !isAppUnlocked) return;
+
+    let idleTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const resetIdleTimer = () => {
+      if (idleTimer) clearTimeout(idleTimer);
+      if (autoLockMinutes > 0) {
+        idleTimer = setTimeout(() => {
+          setIsAppUnlocked(false);
+        }, autoLockMinutes * 60 * 1000);
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden' && lockOnTabHidden) {
+        setIsAppUnlocked(false);
+      } else if (document.visibilityState === 'visible') {
+        resetIdleTimer();
+      }
+    };
+
+    const events = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll'];
+    events.forEach((ev) => window.addEventListener(ev, resetIdleTimer, { passive: true }));
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    resetIdleTimer();
+
+    return () => {
+      if (idleTimer) clearTimeout(idleTimer);
+      events.forEach((ev) => window.removeEventListener(ev, resetIdleTimer));
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [appPin, isAppUnlocked, autoLockMinutes, lockOnTabHidden]);
 
   // Fetch Exchange Rates on Mount & on change
   const refreshExchangeRates = async () => {
@@ -587,6 +724,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
       setAppPinState(null);
       setIsAppUnlocked(true);
       setRecurringTransactions([]);
+      setDebts([]);
       setAuditLogs([]);
       return;
     }
@@ -601,16 +739,20 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     const nowIso = new Date().toISOString();
     const isCreatorEmail = user.email?.toLowerCase() === 'sm.bagja@gmail.com';
 
-    // Load account-specific PIN and migrate legacy global key
+    // Load account-specific PIN and automatically upgrade plaintext PINs to salted SHA-256 hash
     const userPinKey = `${LOCAL_STORAGE_PREFIX}pin_${userId}`;
     const legacyPinKey = `${LOCAL_STORAGE_PREFIX}pin`;
     const legacyPin = localStorage.getItem(legacyPinKey);
     if (legacyPin && !localStorage.getItem(userPinKey)) {
-      // Migrate legacy global PIN to this user's scoped key
-      localStorage.setItem(userPinKey, legacyPin);
+      localStorage.setItem(userPinKey, hashPinSync(legacyPin, userId));
     }
     localStorage.removeItem(legacyPinKey); // Always purge legacy key
-    const savedPin = localStorage.getItem(userPinKey);
+    let savedPin = localStorage.getItem(userPinKey);
+    if (savedPin && !isHashedPin(savedPin)) {
+      // Automatically migrate plaintext 4-digit PIN to salted hash
+      savedPin = hashPinSync(savedPin, userId);
+      localStorage.setItem(userPinKey, savedPin);
+    }
     setAppPinState(savedPin);
     setIsAppUnlocked(!savedPin); // Lock if PIN exists
 
@@ -767,6 +909,37 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
       }
     );
 
+    // Listen to debts from Firestore (with localStorage fallback)
+    const debtsStorageKey = `${LOCAL_STORAGE_PREFIX}debts_${userId}`;
+    const cachedDebts = localStorage.getItem(debtsStorageKey);
+    if (cachedDebts) {
+      try {
+        setDebts(JSON.parse(cachedDebts));
+      } catch {
+        // ignore invalid cache
+      }
+    }
+
+    const debtsPath = `users/${userId}/debts`;
+    const unsubscribeDebts = onSnapshot(
+      collection(db, debtsPath),
+      (snapshot) => {
+        const cloudDebts: DebtRecord[] = [];
+        snapshot.forEach((d) => {
+          cloudDebts.push({ id: d.id, ...d.data() } as DebtRecord);
+        });
+        cloudDebts.sort((a, b) => {
+          if (a.status !== b.status) return a.status === 'unpaid' ? -1 : 1;
+          return (b.createdAt || '').localeCompare(a.createdAt || '');
+        });
+        setDebts(cloudDebts);
+        localStorage.setItem(debtsStorageKey, JSON.stringify(cloudDebts));
+      },
+      (error) => {
+        console.warn('Debts read warning:', error);
+      }
+    );
+
     // Listen to audit logs directly from Firestore
     const auditLogsPath = `users/${userId}/audit_logs`;
     const unsubscribeAudit = onSnapshot(
@@ -789,6 +962,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
       unsubscribeBudgets();
       unsubscribeGoals();
       unsubscribeRecurring();
+      unsubscribeDebts();
       unsubscribeAudit();
     };
   }, [user]);
@@ -903,6 +1077,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     setTransactions([]);
     setRecurringTransactions([]);
     setGoals([]);
+    setDebts([]);
     setAuditLogs([]);
     reconciledOnceRef.current = false;
   };
@@ -1747,20 +1922,173 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     );
   };
 
-  // Export functions
+  const deleteGoal = async (goalId: string) => {
+    const existing = goals.find((g) => g.id === goalId);
+    setGoals((prev) => prev.filter((g) => g.id !== goalId));
+
+    if (user) {
+      const path = `users/${user.uid}/goals`;
+      try {
+        await deleteDoc(doc(db, path, goalId));
+      } catch (err) {
+        handleFirestoreError(err, OperationType.DELETE, path);
+      }
+    }
+
+    if (existing) {
+      logActivity(
+        'DELETE',
+        'GOAL',
+        `Hapus target tabungan: "${existing.title}"`,
+        { goalId, title: existing.title }
+      );
+    }
+  };
+
+  // Debt & Receivable mutations
+  const addDebt = async (debtData: Omit<DebtRecord, 'id' | 'status' | 'paidAmount' | 'userId' | 'createdAt'>) => {
+    const newId = `debt_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const newDebt: DebtRecord = {
+      ...debtData,
+      id: newId,
+      paidAmount: 0,
+      status: 'unpaid',
+      userId: user?.uid || 'local_user',
+      createdAt: new Date().toISOString(),
+    };
+
+    setDebts((prev) => {
+      const next = [newDebt, ...prev];
+      const storageKey = `${LOCAL_STORAGE_PREFIX}debts_${user?.uid || 'guest'}`;
+      localStorage.setItem(storageKey, JSON.stringify(next));
+      return next;
+    });
+
+    if (user) {
+      const path = `users/${user.uid}/debts`;
+      try {
+        await setDoc(doc(db, path, newId), cleanFirestoreData(newDebt));
+      } catch (err) {
+        handleFirestoreError(err, OperationType.WRITE, path);
+      }
+    }
+
+    logActivity(
+      'CREATE',
+      'DEBT',
+      `Catat ${newDebt.type === 'receivable' ? 'piutang' : 'utang'}: ${newDebt.personName} - "${newDebt.title}" (${formatCurrency(newDebt.amount, newDebt.currency)})`,
+      { debtId: newId, ...newDebt }
+    );
+  };
+
+  const settleDebt = async (debtId: string, walletId: string) => {
+    const debt = debts.find((d) => d.id === debtId);
+    const wallet = wallets.find((w) => w.id === walletId);
+    if (!debt || debt.status === 'settled' || !wallet) return;
+
+    const remainingInDebtCurr = Math.max(0, debt.amount - (debt.paidAmount || 0));
+    const amountInWalletCurr = convertCurrency(
+      remainingInDebtCurr,
+      debt.currency,
+      wallet.currency,
+      exchangeRates.rates
+    );
+
+    // Record wallet transaction first (will throw if payable expense exceeds wallet balance)
+    if (debt.type === 'receivable') {
+      await addTransaction({
+        date: new Date().toISOString().split('T')[0],
+        amount: Math.round(amountInWalletCurr * 100) / 100,
+        currency: wallet.currency,
+        type: 'income',
+        categoryId: 'other_income',
+        sourceWalletId: wallet.id,
+        description: `Pelunasan Piutang: ${debt.personName} (${debt.title})`,
+      });
+    } else {
+      await addTransaction({
+        date: new Date().toISOString().split('T')[0],
+        amount: Math.round(amountInWalletCurr * 100) / 100,
+        currency: wallet.currency,
+        type: 'expense',
+        categoryId: 'debt',
+        sourceWalletId: wallet.id,
+        description: `Pelunasan Utang: ${debt.personName} (${debt.title})`,
+      });
+    }
+
+    const updatedDebt: DebtRecord = {
+      ...debt,
+      paidAmount: debt.amount,
+      status: 'settled',
+    };
+
+    setDebts((prev) => {
+      const next = prev.map((d) => (d.id === debtId ? updatedDebt : d));
+      const storageKey = `${LOCAL_STORAGE_PREFIX}debts_${user?.uid || 'guest'}`;
+      localStorage.setItem(storageKey, JSON.stringify(next));
+      return next;
+    });
+
+    if (user) {
+      const path = `users/${user.uid}/debts`;
+      try {
+        await setDoc(doc(db, path, debtId), cleanFirestoreData(updatedDebt));
+      } catch (err) {
+        handleFirestoreError(err, OperationType.WRITE, path);
+      }
+    }
+
+    logActivity(
+      'UPDATE',
+      'DEBT',
+      `Tandai lunas ${debt.type === 'receivable' ? 'piutang' : 'utang'} "${debt.title}" (${debt.personName})`,
+      { debtId, walletId, amount: debt.amount }
+    );
+  };
+
+  const deleteDebt = async (debtId: string) => {
+    const existing = debts.find((d) => d.id === debtId);
+    setDebts((prev) => {
+      const next = prev.filter((d) => d.id !== debtId);
+      const storageKey = `${LOCAL_STORAGE_PREFIX}debts_${user?.uid || 'guest'}`;
+      localStorage.setItem(storageKey, JSON.stringify(next));
+      return next;
+    });
+
+    if (user) {
+      const path = `users/${user.uid}/debts`;
+      try {
+        await deleteDoc(doc(db, path, debtId));
+      } catch (err) {
+        handleFirestoreError(err, OperationType.DELETE, path);
+      }
+    }
+
+    if (existing) {
+      logActivity(
+        'DELETE',
+        'DEBT',
+        `Hapus catatan ${existing.type === 'receivable' ? 'piutang' : 'utang'}: ${existing.personName} - "${existing.title}"`,
+        { debtId }
+      );
+    }
+  };
+
+  // Export functions (hardened against CSV Formula Injection & signed with Integrity Checksum)
   const exportCSV = () => {
     const headers = ['ID', 'Date', 'Type', 'Amount', 'Currency', 'Category', 'Source Wallet', 'Target Wallet', 'Description', 'Notes'];
     const rows = transactions.map((t) => [
-      t.id,
-      t.date,
-      t.type,
+      sanitizeCsvCell(t.id),
+      sanitizeCsvCell(t.date),
+      sanitizeCsvCell(t.type),
       t.amount,
-      t.currency,
-      t.categoryId || '-',
-      wallets.find((w) => w.id === t.sourceWalletId)?.name || t.sourceWalletId,
-      wallets.find((w) => w.id === t.targetWalletId)?.name || t.targetWalletId || '-',
-      `"${(t.description || '').replace(/"/g, '""')}"`,
-      `"${(t.notes || '').replace(/"/g, '""')}"`,
+      sanitizeCsvCell(t.currency),
+      sanitizeCsvCell(t.categoryId || '-'),
+      sanitizeCsvCell(wallets.find((w) => w.id === t.sourceWalletId)?.name || t.sourceWalletId),
+      sanitizeCsvCell(wallets.find((w) => w.id === t.targetWalletId)?.name || t.targetWalletId || '-'),
+      sanitizeCsvCell(t.description || ''),
+      sanitizeCsvCell(t.notes || ''),
     ]);
 
     const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
@@ -1771,16 +2099,29 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+
+    logActivity('CREATE', 'SECURITY', `Ekspor data transaksi CSV (${transactions.length} baris)`, {});
   };
 
   const exportJSON = () => {
-    const backupData = {
-      version: '1.0',
-      exportedAt: new Date().toISOString(),
+    const integrityChecksum = computeBackupChecksum({
       wallets,
       transactions,
+      recurringTransactions,
+      goals,
+      debts,
+    });
+
+    const backupData = {
+      version: '1.2',
+      exportedAt: new Date().toISOString(),
+      integrityChecksum,
+      wallets,
+      transactions,
+      recurringTransactions,
       categories,
       goals,
+      debts,
       preferences: { language, baseCurrency, theme },
     };
 
@@ -1791,28 +2132,60 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     document.body.appendChild(downloadAnchor);
     downloadAnchor.click();
     downloadAnchor.remove();
+
+    logActivity('CREATE', 'SECURITY', 'Ekspor cadangan JSON terverifikasi checksum', {
+      wallets: wallets.length,
+      transactions: transactions.length,
+    });
   };
 
   const importJSON = (jsonString: string): boolean => {
-    try {
-      const parsed = JSON.parse(jsonString);
-      if (parsed.wallets && Array.isArray(parsed.wallets)) {
-        setWallets(parsed.wallets);
-      }
-      if (parsed.transactions && Array.isArray(parsed.transactions)) {
-        setTransactions(parsed.transactions);
-      }
-      if (parsed.categories && Array.isArray(parsed.categories)) {
-        setCategories(parsed.categories);
-      }
-      if (parsed.goals && Array.isArray(parsed.goals)) {
-        setGoals(parsed.goals);
-      }
-      return true;
-    } catch (e) {
-      console.error('Failed to parse backup JSON:', e);
+    const validation = validateAndSanitizeBackupJSON(jsonString);
+    if (!validation.valid || !validation.data) {
       return false;
     }
+
+    const {
+      wallets: safeWallets,
+      transactions: safeTxs,
+      recurringTransactions: safeRec,
+      goals: safeGoals,
+      debts: safeDebts,
+    } = validation.data;
+
+    if (safeWallets.length > 0) setWallets(safeWallets);
+    if (safeTxs.length > 0) setTransactions(safeTxs);
+    if (safeRec.length > 0) setRecurringTransactions(safeRec);
+    if (safeGoals.length > 0) setGoals(safeGoals);
+    if (safeDebts.length > 0) setDebts(safeDebts);
+
+    // Persist validated entities to Firestore if user is authenticated
+    if (user) {
+      const uid = user.uid;
+      safeWallets.forEach((w) => {
+        setDoc(doc(db, `users/${uid}/wallets`, w.id), cleanFirestoreData({ ...w, userId: uid })).catch(console.warn);
+      });
+      safeTxs.forEach((tx) => {
+        setDoc(doc(db, `users/${uid}/transactions`, tx.id), cleanFirestoreData({ ...tx, userId: uid })).catch(console.warn);
+      });
+      safeRec.forEach((rec) => {
+        setDoc(doc(db, `users/${uid}/recurring_transactions`, rec.id), cleanFirestoreData({ ...rec, userId: uid })).catch(console.warn);
+      });
+      safeGoals.forEach((g) => {
+        setDoc(doc(db, `users/${uid}/goals`, g.id), cleanFirestoreData({ ...g, userId: uid })).catch(console.warn);
+      });
+      safeDebts.forEach((d) => {
+        setDoc(doc(db, `users/${uid}/debts`, d.id), cleanFirestoreData({ ...d, userId: uid })).catch(console.warn);
+      });
+    }
+
+    logActivity(
+      'UPDATE',
+      'SECURITY',
+      `Impor cadangan JSON tervalidasi (${safeWallets.length} dompet, ${safeTxs.length} transaksi)`,
+      { checksumVerified: validation.checksumVerified }
+    );
+    return true;
   };
 
   const clearAllDatabaseData = async () => {
@@ -1835,15 +2208,21 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
         await deleteDoc(d.ref);
       }
 
+      const debtsSnap = await getDocs(collection(db, `users/${userId}/debts`));
+      for (const d of debtsSnap.docs) {
+        await deleteDoc(d.ref);
+      }
+
       setWallets([]);
       setTransactions([]);
       setGoals([]);
+      setDebts([]);
 
       // Record audit log
       logActivity(
         'CLEAR',
         'DATABASE',
-        'Pengosongan seluruh data dompet, transaksi, dan target tabungan database cloud',
+        'Pengosongan seluruh data dompet, transaksi, utang/piutang, dan target tabungan database cloud',
         { timestamp: new Date().toISOString() }
       );
     } catch (err) {
@@ -1883,9 +2262,17 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
         toggleTheme,
         appPin,
         isAppUnlocked,
+        pinAttemptState,
         setAppPin,
+        verifyCurrentPin,
         unlockApp,
         lockApp,
+        autoLockMinutes,
+        setAutoLockMinutes,
+        lockOnTabHidden,
+        setLockOnTabHidden,
+        isPrivacyMode,
+        togglePrivacyMode,
         activeTab,
         setActiveTab,
         isTransactionModalOpen,
@@ -1914,6 +2301,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
         recurringTransactions,
         categories,
         goals,
+        debts,
         exchangeRates,
         isRatesLoading,
         refreshExchangeRates,
@@ -1934,6 +2322,10 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
         batchUpdateBudgetLimits,
         addGoal,
         contributeToGoal,
+        deleteGoal,
+        addDebt,
+        settleDebt,
+        deleteDebt,
         auditLogs,
         logActivity,
         exportCSV,

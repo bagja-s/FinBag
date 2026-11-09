@@ -80,6 +80,24 @@ export interface SavingsGoal {
   userId?: string;
 }
 
+export type DebtType = 'payable' | 'receivable';
+export type DebtStatus = 'unpaid' | 'settled';
+
+export interface DebtRecord {
+  id: string;
+  type: DebtType; // 'payable' = Utang Saya, 'receivable' = Piutang (Orang berutang ke saya)
+  personName: string;
+  title: string;
+  amount: number;
+  paidAmount?: number;
+  currency: SupportedCurrency;
+  dueDate?: string; // YYYY-MM-DD
+  status: DebtStatus;
+  notes?: string;
+  userId?: string;
+  createdAt?: string;
+}
+
 export interface CurrencyRatesResponse {
   base: SupportedCurrency;
   date: string;
@@ -110,7 +128,7 @@ export interface UserProfile {
 }
 
 export type AuditAction = 'CREATE' | 'UPDATE' | 'DELETE' | 'TRANSFER' | 'CLEAR';
-export type AuditEntity = 'TRANSACTION' | 'WALLET' | 'GOAL' | 'BUDGET' | 'DATABASE' | 'SECURITY';
+export type AuditEntity = 'TRANSACTION' | 'WALLET' | 'GOAL' | 'BUDGET' | 'DEBT' | 'DATABASE' | 'SECURITY';
 
 export interface AuditLogEntry {
   id: string;

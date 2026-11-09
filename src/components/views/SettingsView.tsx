@@ -25,20 +25,36 @@ import {
   Wallet,
   Clock,
   Calendar,
-  Send
+  Send,
+  ShieldCheck,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { ConfirmationModal } from '../common/ConfirmationModal';
 import { SupportedCurrency, AuditAction, NotificationPreferences } from '../../types/finance';
 import { CURRENCY_METADATA } from '../../services/currencyService';
+import {
+  AutoLockTimeoutMinutes,
+  calculateSecurityHealthScore,
+  validateAndSanitizeBackupJSON,
+} from '../../utils/securityUtils';
 
 export const SettingsView: React.FC = () => {
   const {
+    user,
     goals,
     transactions,
     wallets,
     baseCurrency,
     appPin,
     setAppPin,
+    verifyCurrentPin,
+    autoLockMinutes,
+    setAutoLockMinutes,
+    lockOnTabHidden,
+    setLockOnTabHidden,
+    isPrivacyMode,
+    togglePrivacyMode,
     clearAllDatabaseData,
     openTutorial,
     notificationPermission,
@@ -71,12 +87,16 @@ export const SettingsView: React.FC = () => {
   // PIN settings state
   const [newPinInput, setNewPinInput] = useState('');
   const [confirmPinInput, setConfirmPinInput] = useState('');
+  const [currentPinVerifyInput, setCurrentPinVerifyInput] = useState('');
+  const [showRemovePinVerify, setShowRemovePinVerify] = useState(false);
   const [pinSuccessMsg, setPinSuccessMsg] = useState(false);
   const [pinErrorMsg, setPinErrorMsg] = useState<string | null>(null);
   const [showPinConfirm, setShowPinConfirm] = useState(false);
 
   // Database reset state
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [resetPinInput, setResetPinInput] = useState('');
+  const [resetPinError, setResetPinError] = useState<string | null>(null);
   const [isResetting, setIsResetting] = useState(false);
   const [resetSuccessMsg, setResetSuccessMsg] = useState(false);
 
@@ -88,11 +108,29 @@ export const SettingsView: React.FC = () => {
   // Audit Log filter state
   const [auditActionFilter, setAuditActionFilter] = useState<'ALL' | AuditAction>('ALL');
 
+  const securityAssessment = calculateSecurityHealthScore({
+    isAuthenticated: Boolean(user),
+    isEmailVerified: Boolean(user?.emailVerified ?? true),
+    hasPinEnabled: Boolean(appPin),
+    autoLockMinutes,
+    lockOnTabHidden,
+  });
+
   const handleClearDatabase = async () => {
+    if (appPin && !verifyCurrentPin(resetPinInput)) {
+      setResetPinError(
+        language === 'id'
+          ? 'PIN Keamanan salah. Masukkan PIN aplikasi Anda untuk mengosongkan database.'
+          : 'Incorrect Security PIN. Enter your app PIN to wipe the database.'
+      );
+      return;
+    }
+    setResetPinError(null);
     setIsResetting(true);
     try {
       await clearAllDatabaseData();
       setShowResetConfirm(false);
+      setResetPinInput('');
       setResetSuccessMsg(true);
       setTimeout(() => setResetSuccessMsg(false), 4000);
     } catch (err) {
@@ -103,6 +141,7 @@ export const SettingsView: React.FC = () => {
   };
 
   const handleSavePin = () => {
+    setPinErrorMsg(null);
     if (newPinInput.length !== 4 || !/^\d+$/.test(newPinInput)) {
       setPinErrorMsg(t.pinInvalid);
       return;
@@ -124,13 +163,34 @@ export const SettingsView: React.FC = () => {
   };
 
   const handleRemovePin = () => {
+    setPinErrorMsg(null);
+    if (!showRemovePinVerify) {
+      setShowRemovePinVerify(true);
+      return;
+    }
+    if (!verifyCurrentPin(currentPinVerifyInput)) {
+      setPinErrorMsg(
+        language === 'id'
+          ? 'Verifikasi gagal: PIN saat ini tidak sesuai.'
+          : 'Verification failed: Current PIN does not match.'
+      );
+      return;
+    }
     setAppPin(null);
+    setCurrentPinVerifyInput('');
+    setShowRemovePinVerify(false);
     setPinSuccessMsg(true);
     setTimeout(() => setPinSuccessMsg(false), 3000);
   };
 
   const handleImportJson = () => {
     try {
+      const check = validateAndSanitizeBackupJSON(importJsonInput);
+      if (!check.valid) {
+        setImportJsonError(check.error || t.importError);
+        setImportJsonSuccess(false);
+        return;
+      }
       const success = importJSON(importJsonInput);
       if (success) {
         setImportJsonSuccess(true);
@@ -251,31 +311,134 @@ export const SettingsView: React.FC = () => {
         </div>
       </div>
 
-      {/* 2. Security & PIN */}
+      {/* 2. Security & Privacy Center */}
       <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        <div className="flex items-center gap-2 pb-3 border-b border-slate-100 dark:border-slate-800">
-          <Lock className="h-5 w-5 text-rose-500" />
-          <h2 className="text-sm font-bold text-slate-900 dark:text-white">{t.securitySection}</h2>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100 dark:border-slate-800">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="h-5 w-5 text-emerald-500" />
+            <h2 className="text-sm font-bold text-slate-900 dark:text-white">
+              {language === 'id' ? 'Pusat Keamanan & Privasi' : 'Security & Privacy Center'}
+            </h2>
+          </div>
+          <span
+            className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-bold ${
+              securityAssessment.level === 'strong'
+                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800'
+                : securityAssessment.level === 'moderate'
+                ? 'bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800'
+                : 'bg-slate-100 text-slate-700 border border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700'
+            }`}
+          >
+            <span>
+              {language === 'id' ? 'Skor Keamanan:' : 'Security Score:'} {securityAssessment.score}/100
+            </span>
+          </span>
         </div>
 
-        <div className="mt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        {/* Security Health Checklist */}
+        <div className="mt-4 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40 p-3.5">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              {language === 'id' ? 'Status Lapisan Proteksi' : 'Protection Layers Status'}
+            </span>
+            <span className="text-[11px] font-mono font-semibold text-slate-600 dark:text-slate-300">
+              {securityAssessment.score}%
+            </span>
+          </div>
+          <div className="h-1.5 w-full rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden mb-3">
+            <div
+              className={`h-full transition-all duration-300 ${
+                securityAssessment.level === 'strong'
+                  ? 'bg-emerald-500'
+                  : securityAssessment.level === 'moderate'
+                  ? 'bg-amber-500'
+                  : 'bg-blue-500'
+              }`}
+              style={{ width: `${securityAssessment.score}%` }}
+            />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {securityAssessment.checks.map((chk) => (
+              <div key={chk.id} className="flex items-center gap-2 text-[11px]">
+                <span
+                  className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full ${
+                    chk.passed
+                      ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400'
+                      : 'bg-slate-200 text-slate-400 dark:bg-slate-700 dark:text-slate-500'
+                  }`}
+                >
+                  <Check className="h-2.5 w-2.5 stroke-[3]" />
+                </span>
+                <span
+                  className={
+                    chk.passed
+                      ? 'font-medium text-slate-700 dark:text-slate-200'
+                      : 'text-slate-400 dark:text-slate-500'
+                  }
+                >
+                  {language === 'id' ? chk.labelId : chk.labelEn}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* 2.1 Encrypted PIN Lock */}
+        <div className="mt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-3 border-t border-slate-100 dark:border-slate-800">
           <div>
-            <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">
-              {appPin ? t.pinEnabled : t.pinDisabled}
-            </p>
+            <div className="flex items-center gap-2">
+              <Lock className="h-3.5 w-3.5 text-rose-500" />
+              <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                {appPin ? t.pinEnabled : t.pinDisabled}
+              </p>
+            </div>
             <p className="text-xs text-slate-400 mt-0.5">
-              Lindungi catatan saldo dan data transaksi dengan 4-digit PIN saat membuka aplikasi.
+              {language === 'id'
+                ? 'PIN disimpan dalam bentuk Salted Hash (SHA-256) dengan proteksi anti brute-force (maks 5x percobaan).'
+                : 'PIN is stored as a Salted SHA-256 Hash with brute-force lockout protection (max 5 attempts).'}
             </p>
           </div>
 
           <div className="flex items-center gap-2">
             {appPin ? (
-              <button
-                onClick={handleRemovePin}
-                className="rounded-xl border border-rose-300 bg-rose-50 px-4 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-100 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-400"
-              >
-                {t.pinRemove}
-              </button>
+              showRemovePinVerify ? (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="password"
+                    maxLength={4}
+                    placeholder={language === 'id' ? 'PIN Saat Ini' : 'Current PIN'}
+                    value={currentPinVerifyInput}
+                    onChange={(e) => setCurrentPinVerifyInput(e.target.value)}
+                    className="h-9 w-28 rounded-xl border border-rose-300 bg-white px-3 text-center text-xs font-mono font-bold dark:border-rose-800 dark:bg-slate-800 dark:text-white"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleRemovePin}
+                    className="rounded-xl bg-rose-600 px-3 py-2 text-xs font-bold text-white hover:bg-rose-500 cursor-pointer"
+                  >
+                    {language === 'id' ? 'Konfirmasi Hapus' : 'Confirm Remove'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowRemovePinVerify(false);
+                      setCurrentPinVerifyInput('');
+                      setPinErrorMsg(null);
+                    }}
+                    className="rounded-xl border border-slate-200 dark:border-slate-700 px-2.5 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+                  >
+                    {t.cancel}
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleRemovePin}
+                  className="rounded-xl border border-rose-300 bg-rose-50 px-4 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-100 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-400 cursor-pointer"
+                >
+                  {t.pinRemove}
+                </button>
+              )
             ) : (
               <div className="flex items-center gap-2">
                 <input
@@ -283,12 +446,15 @@ export const SettingsView: React.FC = () => {
                   maxLength={4}
                   placeholder={showPinConfirm ? t.pinConfirm : t.pinSet}
                   value={showPinConfirm ? confirmPinInput : newPinInput}
-                  onChange={(e) => showPinConfirm ? setConfirmPinInput(e.target.value) : setNewPinInput(e.target.value)}
+                  onChange={(e) =>
+                    showPinConfirm ? setConfirmPinInput(e.target.value) : setNewPinInput(e.target.value)
+                  }
                   className="h-9 w-28 rounded-xl border border-slate-200 bg-slate-50 px-3 text-center text-xs font-mono font-bold dark:border-slate-700 dark:bg-slate-800 dark:text-white"
                 />
                 <button
+                  type="button"
                   onClick={handleSavePin}
-                  className="rounded-xl bg-blue-600 px-3.5 py-2 text-xs font-bold text-white hover:bg-blue-500"
+                  className="rounded-xl bg-blue-600 px-3.5 py-2 text-xs font-bold text-white hover:bg-blue-500 cursor-pointer"
                 >
                   {showPinConfirm ? t.save : t.pinSet}
                 </button>
@@ -297,15 +463,125 @@ export const SettingsView: React.FC = () => {
           </div>
         </div>
 
-        {pinErrorMsg && (
-          <p className="mt-2 text-xs font-semibold text-rose-500">{pinErrorMsg}</p>
-        )}
+        {pinErrorMsg && <p className="mt-2 text-xs font-semibold text-rose-500">{pinErrorMsg}</p>}
 
         {pinSuccessMsg && (
           <p className="mt-2 text-xs font-semibold text-emerald-500">
-            Pengaturan PIN berhasil diperbarui.
+            {language === 'id'
+              ? 'Pengaturan PIN keamanan berhasil diperbarui.'
+              : 'Security PIN settings updated successfully.'}
           </p>
         )}
+
+        {/* 2.2 Auto-Lock Idle Timeout & Tab Hidden Lock */}
+        {appPin && (
+          <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                  {language === 'id'
+                    ? 'Kunci Otomatis Saat Tidak Aktif (Idle Auto-Lock)'
+                    : 'Auto-Lock on Inactivity'}
+                </p>
+                <p className="text-[11px] text-slate-400">
+                  {language === 'id'
+                    ? 'Kunci kembali aplikasi secara otomatis jika tidak ada aktivitas layar.'
+                    : 'Automatically lock the application when idle.'}
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5">
+                {([0, 1, 5, 15, 30] as AutoLockTimeoutMinutes[]).map((min) => (
+                  <button
+                    key={min}
+                    type="button"
+                    onClick={() => setAutoLockMinutes(min)}
+                    className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold border transition-colors cursor-pointer ${
+                      autoLockMinutes === min
+                        ? 'border-blue-600 bg-blue-50 text-blue-700 dark:border-blue-500 dark:bg-blue-950/60 dark:text-blue-300'
+                        : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                    }`}
+                  >
+                    {min === 0
+                      ? language === 'id'
+                        ? 'Nonaktif'
+                        : 'Off'
+                      : `${min} ${language === 'id' ? 'Mnt' : 'Min'}`}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between gap-3 pt-2">
+              <div>
+                <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                  {language === 'id'
+                    ? 'Kunci Otomatis Saat Pindah Tab / Layar Diminimalkan'
+                    : 'Auto-Lock When Browser Tab is Hidden'}
+                </p>
+                <p className="text-[11px] text-slate-400">
+                  {language === 'id'
+                    ? 'Segera kunci aplikasi begitu Anda berpindah ke tab lain atau meminimalkan jendela.'
+                    : 'Immediately lock the app when switching tabs or minimizing the window.'}
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={lockOnTabHidden}
+                onClick={() => setLockOnTabHidden(!lockOnTabHidden)}
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
+                  lockOnTabHidden ? 'bg-blue-600' : 'bg-slate-300 dark:bg-slate-700'
+                }`}
+              >
+                <span
+                  aria-hidden="true"
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md transition duration-200 ease-in-out ${
+                    lockOnTabHidden ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* 2.3 Privacy Masking (Sensor Saldo) */}
+        <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3">
+          <div className="flex items-start gap-2.5">
+            {isPrivacyMode ? (
+              <EyeOff className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
+            ) : (
+              <Eye className="h-4 w-4 text-blue-500 mt-0.5 shrink-0" />
+            )}
+            <div>
+              <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                {language === 'id'
+                  ? 'Mode Privasi / Sensor Nominal Saldo (Rp •••••••)'
+                  : 'Privacy Mode / Mask Sensitive Balances'}
+              </p>
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                {language === 'id'
+                  ? 'Sembunyikan seluruh angka nominal saldo dan mutasi saat membuka aplikasi di tempat umum.'
+                  : 'Mask all currency amounts across the app when viewing in public spaces.'}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={isPrivacyMode}
+            onClick={togglePrivacyMode}
+            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
+              isPrivacyMode ? 'bg-amber-500' : 'bg-slate-300 dark:bg-slate-700'
+            }`}
+          >
+            <span
+              aria-hidden="true"
+              className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md transition duration-200 ease-in-out ${
+                isPrivacyMode ? 'translate-x-5' : 'translate-x-0'
+              }`}
+            />
+          </button>
+        </div>
       </div>
 
       {/* 3. Push Notifications */}
@@ -612,16 +888,43 @@ export const SettingsView: React.FC = () => {
               </button>
             </div>
 
-            {resetSuccessMsg && (
-              <p className="mt-3 text-xs font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
-                <CheckCircle2 className="h-4 w-4" />
-                <span>
-                  {language === 'id' 
-                    ? 'Seluruh data di database cloud Anda telah berhasil dikosongkan.' 
-                    : 'All data in your cloud database has been successfully cleared.'}
-                </span>
-              </p>
-            )}
+              {appPin && (
+                <div className="mt-3 flex flex-col sm:flex-row sm:items-center gap-2 pt-3 border-t border-rose-200/60 dark:border-rose-900/40">
+                  <label className="text-[11px] font-semibold text-rose-700 dark:text-rose-300">
+                    {language === 'id'
+                      ? 'Masukkan PIN Keamanan sebelum menghapus database:'
+                      : 'Enter Security PIN before wiping database:'}
+                  </label>
+                  <input
+                    type="password"
+                    maxLength={4}
+                    value={resetPinInput}
+                    onChange={(e) => {
+                      setResetPinInput(e.target.value);
+                      setResetPinError(null);
+                    }}
+                    placeholder="4-digit PIN"
+                    className="h-8 w-28 rounded-lg border border-rose-300 bg-white px-2.5 text-center text-xs font-mono font-bold dark:border-rose-800 dark:bg-slate-900 dark:text-white"
+                  />
+                </div>
+              )}
+
+              {resetPinError && (
+                <p className="mt-2 text-xs font-semibold text-rose-600 dark:text-rose-400">
+                  {resetPinError}
+                </p>
+              )}
+
+              {resetSuccessMsg && (
+                <p className="mt-3 text-xs font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+                  <CheckCircle2 className="h-4 w-4" />
+                  <span>
+                    {language === 'id' 
+                      ? 'Seluruh data di database cloud Anda telah berhasil dikosongkan.' 
+                      : 'All data in your cloud database has been successfully cleared.'}
+                  </span>
+                </p>
+              )}
           </div>
         </div>
       </div>

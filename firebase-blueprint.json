@@ -112,6 +112,25 @@
       },
       "required": ["title", "targetAmount", "currentAmount", "currency", "userId"]
     },
+    "debtRecord": {
+      "title": "DebtRecord",
+      "description": "Debt (payable) or receivable record tracked by the user",
+      "type": "object",
+      "properties": {
+        "type": { "type": "string", "enum": ["payable", "receivable"] },
+        "personName": { "type": "string", "maxLength": 100 },
+        "title": { "type": "string", "maxLength": 150 },
+        "amount": { "type": "number" },
+        "paidAmount": { "type": "number" },
+        "currency": { "type": "string", "maxLength": 5 },
+        "dueDate": { "type": "string", "maxLength": 20 },
+        "status": { "type": "string", "enum": ["unpaid", "settled"] },
+        "notes": { "type": "string", "maxLength": 500 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["type", "personName", "title", "amount", "currency", "status", "userId"]
+    },
     "auditLog": {
       "title": "AuditLog",
       "description": "Immutable change history log for data auditing and security",
@@ -121,7 +140,7 @@
         "userEmail": { "type": "string", "maxLength": 200 },
         "timestamp": { "type": "string", "maxLength": 50 },
         "action": { "type": "string", "enum": ["CREATE", "UPDATE", "DELETE", "TRANSFER", "CLEAR"] },
-        "entity": { "type": "string", "enum": ["TRANSACTION", "WALLET", "GOAL", "BUDGET", "DATABASE", "SECURITY"] },
+        "entity": { "type": "string", "enum": ["TRANSACTION", "WALLET", "GOAL", "BUDGET", "DEBT", "DATABASE", "SECURITY"] },
         "summary": { "type": "string", "maxLength": 250 },
         "details": { "type": "object" }
       },
@@ -152,6 +171,10 @@
     "/users/{userId}/goals/{goalId}": {
       "schema": "goal",
       "description": "Stores financial savings goals for the user"
+    },
+    "/users/{userId}/debts/{debtId}": {
+      "schema": "debtRecord",
+      "description": "Stores debt and receivable records for the user"
     },
     "/users/{userId}/audit_logs/{logId}": {
       "schema": "auditLog",

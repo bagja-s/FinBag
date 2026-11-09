@@ -14,7 +14,8 @@ import { useFinance } from '../../context/FinanceContext';
 import { getTranslation } from '../../i18n/translations';
 import { 
   formatCurrency, 
-  calculateCategorySpending 
+  calculateCategorySpending,
+  calculateSixMonthCashFlowTrend
 } from '../../utils/financeCalculations';
 import { 
   Calendar, 
@@ -23,6 +24,7 @@ import {
   AlertTriangle, 
   CheckCircle2, 
   TrendingDown, 
+  TrendingUp,
   Target, 
   SlidersHorizontal 
 } from 'lucide-react';
@@ -44,6 +46,7 @@ export const MonthlyBudgetReport: React.FC = () => {
   const currentMonthStr = useMemo(() => new Date().toISOString().slice(0, 7), []);
   const [selectedMonth, setSelectedMonth] = useState<string>(currentMonthStr);
   const [chartFilter, setChartFilter] = useState<'active' | 'all'>('all');
+  const [reportMode, setReportMode] = useState<'budget' | 'trend'>('budget');
 
   // Generate the last 12 months for selector
   const availableMonths = useMemo(() => {
@@ -170,6 +173,31 @@ export const MonthlyBudgetReport: React.FC = () => {
     return chartData;
   }, [chartFilter, activeSpendingData, chartData]);
 
+  // 6-Month Cash Flow & Savings Rate Trend ending at selectedMonth
+  const sixMonthTrendData = useMemo(() => {
+    return calculateSixMonthCashFlowTrend(
+      transactions,
+      selectedMonth,
+      exchangeRates.rates,
+      baseCurrency,
+      language === 'id' ? 'id-ID' : 'en-US'
+    );
+  }, [transactions, selectedMonth, exchangeRates.rates, baseCurrency, language]);
+
+  const sixMonthStats = useMemo(() => {
+    const activeMonths = sixMonthTrendData.filter((m) => m.income > 0 || m.expense > 0);
+    const totalInc = sixMonthTrendData.reduce((s, m) => s + m.income, 0);
+    const totalExp = sixMonthTrendData.reduce((s, m) => s + m.expense, 0);
+    const netSav = totalInc - totalExp;
+    const avgSavingsRate =
+      totalInc > 0
+        ? Math.max(-100, Math.min(100, Math.round((netSav / totalInc) * 100)))
+        : activeMonths.length > 0
+        ? Math.round(activeMonths.reduce((s, m) => s + m.savingsRatePercent, 0) / activeMonths.length)
+        : 0;
+    return { totalInc, totalExp, netSav, avgSavingsRate };
+  }, [sixMonthTrendData]);
+
   const variance = totalBudget - totalActual;
   const isOverallOverBudget = totalBudget > 0 && totalActual > totalBudget;
   const overallPercentage = totalBudget > 0 ? Math.round((totalActual / totalBudget) * 100) : 0;
@@ -286,7 +314,33 @@ export const MonthlyBudgetReport: React.FC = () => {
 
         {/* Month Selector & Filter Controls */}
         <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
-          {activeSpendingData.length > 0 && activeSpendingData.length < chartData.length && (
+          {/* Report Mode Switcher: Realisasi Anggaran vs Tren 6 Bulan */}
+          <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200/70 dark:border-slate-700/60">
+            <button
+              type="button"
+              onClick={() => setReportMode('budget')}
+              className={`px-2.5 py-1 text-[11px] font-semibold rounded-lg transition-colors cursor-pointer whitespace-nowrap ${
+                reportMode === 'budget'
+                  ? 'bg-white text-blue-600 shadow-xs dark:bg-slate-900 dark:text-blue-400'
+                  : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'
+              }`}
+            >
+              {language === 'id' ? 'Anggaran Kategori' : 'Category Budget'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setReportMode('trend')}
+              className={`px-2.5 py-1 text-[11px] font-semibold rounded-lg transition-colors cursor-pointer whitespace-nowrap ${
+                reportMode === 'trend'
+                  ? 'bg-white text-emerald-600 shadow-xs dark:bg-slate-900 dark:text-emerald-400'
+                  : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'
+              }`}
+            >
+              {language === 'id' ? 'Tren 6 Bulan' : '6M Trend'}
+            </button>
+          </div>
+
+          {reportMode === 'budget' && activeSpendingData.length > 0 && activeSpendingData.length < chartData.length && (
             <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200/70 dark:border-slate-700/60">
               <button
                 onClick={() => setChartFilter('active')}
@@ -448,109 +502,260 @@ export const MonthlyBudgetReport: React.FC = () => {
         </div>
       )}
 
-      {/* Recharts Horizontal Grouped Bar Chart (Prevents Category Label Overlapping) */}
-      <div className="mt-6">
-        {displayedChartData.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 px-4 text-center rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/20">
-            <SlidersHorizontal className="h-8 w-8 text-slate-300 dark:text-slate-600 mb-2" />
-            <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-              {t.noExpenseThisMonth}
-            </p>
-            <p className="text-[11px] text-slate-400 mt-1 max-w-sm">
-              {language === 'id' 
-                ? 'Catat transaksi pengeluaran baru atau atur pagu anggaran kategori untuk melihat visualisasi perbandingan di sini.' 
-                : 'Record new expenses or set up category budget limits to view the comparison chart here.'}
-            </p>
-            <button
-              onClick={() => setActiveTab('budgets')}
-              className="mt-3 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
-            >
-              {t.configureBudgets} →
-            </button>
+      {/* Chart Body: Either 6-Month Cash Flow & Savings Rate Trend OR Category Spending vs Budget */}
+      {reportMode === 'trend' ? (
+        <div className="mt-6 space-y-4">
+          {/* 6-Month Summary Strip */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="rounded-2xl border border-emerald-200/60 bg-emerald-50/50 p-3.5 dark:border-emerald-900/40 dark:bg-emerald-950/20">
+              <span className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">
+                {language === 'id' ? 'Total Pemasukan (6 Bulan)' : '6-Month Income'}
+              </span>
+              <p className="mt-1 font-mono text-base font-extrabold text-emerald-600 dark:text-emerald-400 tabular-nums">
+                +{formatCurrency(sixMonthStats.totalInc, baseCurrency)}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-rose-200/60 bg-rose-50/50 p-3.5 dark:border-rose-900/40 dark:bg-rose-950/20">
+              <span className="text-[11px] font-semibold text-rose-700 dark:text-rose-300">
+                {language === 'id' ? 'Total Pengeluaran (6 Bulan)' : '6-Month Expense'}
+              </span>
+              <p className="mt-1 font-mono text-base font-extrabold text-rose-600 dark:text-rose-400 tabular-nums">
+                -{formatCurrency(sixMonthStats.totalExp, baseCurrency)}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-blue-200/60 bg-blue-50/50 p-3.5 dark:border-blue-900/40 dark:bg-blue-950/20">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-semibold text-blue-700 dark:text-blue-300">
+                  {language === 'id' ? 'Rata-Rata Savings Rate' : 'Avg Savings Rate'}
+                </span>
+                <TrendingUp className="h-3.5 w-3.5 text-blue-500" />
+              </div>
+              <p className="mt-1 font-mono text-base font-extrabold text-blue-600 dark:text-blue-400 tabular-nums">
+                {sixMonthStats.avgSavingsRate}%{' '}
+                <span className="text-xs font-normal text-slate-500">
+                  ({sixMonthStats.netSav >= 0 ? '+' : ''}
+                  {formatCurrency(sixMonthStats.netSav, baseCurrency)})
+                </span>
+              </p>
+            </div>
           </div>
-        ) : (
-          <div className="w-full" style={{ height: `${dynamicChartHeight}px` }}>
+
+          {/* 6-Month Grouped Bar Chart */}
+          <div className="h-[290px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
-                data={displayedChartData}
-                layout="vertical"
-                margin={{ top: 12, right: 20, left: 10, bottom: 12 }}
-                barGap={4}
-                barCategoryGap="22%"
+                data={sixMonthTrendData}
+                margin={{ top: 12, right: 16, left: 4, bottom: 8 }}
+                barGap={6}
               >
-                <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={true} stroke={gridColor} />
-                <XAxis 
-                  type="number"
-                  tick={{ fill: axisColor, fontSize: 10 }}
+                <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
+                <XAxis
+                  dataKey="shortLabel"
+                  tick={{ fill: axisColor, fontSize: 11, fontWeight: 600 }}
                   axisLine={{ stroke: gridColor }}
                   tickLine={false}
+                />
+                <YAxis
+                  tick={{ fill: axisColor, fontSize: 10 }}
+                  axisLine={false}
+                  tickLine={false}
                   tickFormatter={(val) => {
-                    if (val >= 1000000) {
-                      return `${(val / 1000000).toFixed(val % 1000000 === 0 ? 0 : 1)}M`;
-                    }
-                    if (val >= 1000) {
-                      return `${(val / 1000).toFixed(0)}k`;
-                    }
+                    if (val >= 1000000) return `${(val / 1000000).toFixed(val % 1000000 === 0 ? 0 : 1)}M`;
+                    if (val >= 1000) return `${(val / 1000).toFixed(0)}k`;
                     return String(val);
                   }}
                 />
-                <YAxis 
-                  type="category"
-                  dataKey="name"
-                  width={155}
-                  tick={renderCategoryTick}
-                  axisLine={false}
-                  tickLine={false}
-                  interval={0}
-                />
-                <Tooltip content={<CustomTooltip />} cursor={{ fill: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)' }} />
-                <Legend 
-                  verticalAlign="top" 
-                  align="right" 
-                  iconType="circle"
-                  iconSize={8}
-                  wrapperStyle={{ paddingBottom: 14, fontSize: 11 }}
-                  formatter={(value) => {
-                    const label = value === 'actualSpent' ? t.actualSpending : t.budgetLimit;
-                    return <span className="text-slate-600 dark:text-slate-300 font-medium ml-1 mr-3">{label}</span>;
+                <Tooltip
+                  cursor={{ fill: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)' }}
+                  content={({ active, payload }) => {
+                    if (!active || !payload || !payload.length) return null;
+                    const pt = payload[0]?.payload;
+                    if (!pt) return null;
+                    return (
+                      <div className="rounded-xl border border-slate-200 bg-white/95 p-3.5 shadow-xl backdrop-blur-md dark:border-slate-700 dark:bg-slate-900/95 text-xs min-w-[210px] space-y-1.5">
+                        <p className="font-bold text-slate-900 dark:text-white border-b border-slate-100 pb-1 dark:border-slate-800">
+                          {pt.fullLabel}
+                        </p>
+                        <div className="flex justify-between gap-4">
+                          <span className="text-slate-500">{language === 'id' ? 'Pemasukan:' : 'Income:'}</span>
+                          <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">
+                            +{formatCurrency(pt.income, baseCurrency)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between gap-4">
+                          <span className="text-slate-500">{language === 'id' ? 'Pengeluaran:' : 'Expense:'}</span>
+                          <span className="font-mono font-bold text-rose-600 dark:text-rose-400 tabular-nums">
+                            -{formatCurrency(pt.expense, baseCurrency)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between gap-4 pt-1 border-t border-slate-100 dark:border-slate-800">
+                          <span className="text-slate-500">Savings Rate:</span>
+                          <span className={`font-mono font-bold tabular-nums ${
+                            pt.savingsRatePercent >= 20
+                              ? 'text-emerald-600 dark:text-emerald-400'
+                              : pt.savingsRatePercent >= 0
+                              ? 'text-amber-500'
+                              : 'text-rose-500'
+                          }`}>
+                            {pt.savingsRatePercent}% ({pt.netSavings >= 0 ? '+' : ''}
+                            {formatCurrency(pt.netSavings, baseCurrency)})
+                          </span>
+                        </div>
+                      </div>
+                    );
                   }}
                 />
-                
-                {/* Bar 1: Actual Spending */}
-                <Bar 
-                  dataKey="actualSpent" 
-                  name="actualSpent"
-                  radius={[0, 6, 6, 0]}
-                  barSize={12}
-                >
-                  {displayedChartData.map((entry, index) => (
-                    <Cell 
-                      key={`actual-cell-${index}`} 
-                      fill={entry.isOver ? '#F43F5E' : '#3B82F6'} 
-                    />
-                  ))}
-                </Bar>
-
-                {/* Bar 2: Budget Limit */}
-                <Bar 
-                  dataKey="budgetLimit" 
-                  name="budgetLimit"
-                  fill={isDark ? '#475569' : '#94A3B8'} 
-                  radius={[0, 6, 6, 0]}
-                  barSize={12}
+                <Legend
+                  verticalAlign="top"
+                  align="right"
+                  iconType="circle"
+                  iconSize={8}
+                  wrapperStyle={{ paddingBottom: 10, fontSize: 11 }}
+                  formatter={(val) => (
+                    <span className="text-slate-600 dark:text-slate-300 font-medium ml-1 mr-3">
+                      {val === 'income'
+                        ? (language === 'id' ? 'Pemasukan' : 'Income')
+                        : (language === 'id' ? 'Pengeluaran' : 'Expense')}
+                    </span>
+                  )}
                 />
+                <Bar dataKey="income" name="income" fill="#10B981" radius={[6, 6, 0, 0]} barSize={18} />
+                <Bar dataKey="expense" name="expense" fill="#F43F5E" radius={[6, 6, 0, 0]} barSize={18} />
               </BarChart>
             </ResponsiveContainer>
           </div>
-        )}
-      </div>
 
-      {/* Footer Insight / Tip */}
-      {displayedChartData.length > 0 && overbudgetItems.length === 0 && totalBudget > 0 && (
-        <div className="mt-4 flex items-center gap-2 rounded-2xl bg-emerald-50 border border-emerald-200/80 p-3 text-xs text-emerald-800 dark:bg-emerald-950/30 dark:border-emerald-900/50 dark:text-emerald-300">
-          <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
-          <span>{t.budgetHealthyDesc}</span>
+          {/* Monthly Savings Rate Pills */}
+          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 pt-1">
+            {sixMonthTrendData.map((pt) => (
+              <div
+                key={pt.monthKey}
+                className="rounded-xl border border-slate-100 bg-slate-50/70 px-2.5 py-2 text-center dark:border-slate-800 dark:bg-slate-800/40"
+              >
+                <span className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400">
+                  {pt.shortLabel}
+                </span>
+                <span className={`font-mono text-xs font-extrabold tabular-nums ${
+                  pt.savingsRatePercent >= 20
+                    ? 'text-emerald-600 dark:text-emerald-400'
+                    : pt.savingsRatePercent > 0
+                    ? 'text-blue-600 dark:text-blue-400'
+                    : pt.income === 0 && pt.expense === 0
+                    ? 'text-slate-400'
+                    : 'text-rose-500'
+                }`}>
+                  {pt.income === 0 && pt.expense === 0 ? '—' : `${pt.savingsRatePercent}%`}
+                </span>
+              </div>
+            ))}
+          </div>
         </div>
+      ) : (
+        <>
+          <div className="mt-6">
+            {displayedChartData.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 px-4 text-center rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/20">
+                <SlidersHorizontal className="h-8 w-8 text-slate-300 dark:text-slate-600 mb-2" />
+                <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  {t.noExpenseThisMonth}
+                </p>
+                <p className="text-[11px] text-slate-400 mt-1 max-w-sm">
+                  {language === 'id' 
+                    ? 'Catat transaksi pengeluaran baru atau atur pagu anggaran kategori untuk melihat visualisasi perbandingan di sini.' 
+                    : 'Record new expenses or set up category budget limits to view the comparison chart here.'}
+                </p>
+                <button
+                  onClick={() => setActiveTab('budgets')}
+                  className="mt-3 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                >
+                  {t.configureBudgets} →
+                </button>
+              </div>
+            ) : (
+              <div className="w-full" style={{ height: `${dynamicChartHeight}px` }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={displayedChartData}
+                    layout="vertical"
+                    margin={{ top: 12, right: 20, left: 10, bottom: 12 }}
+                    barGap={4}
+                    barCategoryGap="22%"
+                  >
+                    <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={true} stroke={gridColor} />
+                    <XAxis 
+                      type="number"
+                      tick={{ fill: axisColor, fontSize: 10 }}
+                      axisLine={{ stroke: gridColor }}
+                      tickLine={false}
+                      tickFormatter={(val) => {
+                        if (val >= 1000000) {
+                          return `${(val / 1000000).toFixed(val % 1000000 === 0 ? 0 : 1)}M`;
+                        }
+                        if (val >= 1000) {
+                          return `${(val / 1000).toFixed(0)}k`;
+                        }
+                        return String(val);
+                      }}
+                    />
+                    <YAxis 
+                      type="category"
+                      dataKey="name"
+                      width={155}
+                      tick={renderCategoryTick}
+                      axisLine={false}
+                      tickLine={false}
+                      interval={0}
+                    />
+                    <Tooltip content={<CustomTooltip />} cursor={{ fill: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)' }} />
+                    <Legend 
+                      verticalAlign="top" 
+                      align="right" 
+                      iconType="circle"
+                      iconSize={8}
+                      wrapperStyle={{ paddingBottom: 14, fontSize: 11 }}
+                      formatter={(value) => {
+                        const label = value === 'actualSpent' ? t.actualSpending : t.budgetLimit;
+                        return <span className="text-slate-600 dark:text-slate-300 font-medium ml-1 mr-3">{label}</span>;
+                      }}
+                    />
+                    
+                    {/* Bar 1: Actual Spending */}
+                    <Bar 
+                      dataKey="actualSpent" 
+                      name="actualSpent"
+                      radius={[0, 6, 6, 0]}
+                      barSize={12}
+                    >
+                      {displayedChartData.map((entry, index) => (
+                        <Cell 
+                          key={`actual-cell-${index}`} 
+                          fill={entry.isOver ? '#F43F5E' : '#3B82F6'} 
+                        />
+                      ))}
+                    </Bar>
+
+                    {/* Bar 2: Budget Limit */}
+                    <Bar 
+                      dataKey="budgetLimit" 
+                      name="budgetLimit"
+                      fill={isDark ? '#475569' : '#94A3B8'} 
+                      radius={[0, 6, 6, 0]}
+                      barSize={12}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </div>
+
+          {/* Footer Insight / Tip */}
+          {displayedChartData.length > 0 && overbudgetItems.length === 0 && totalBudget > 0 && (
+            <div className="mt-4 flex items-center gap-2 rounded-2xl bg-emerald-50 border border-emerald-200/80 p-3 text-xs text-emerald-800 dark:bg-emerald-950/30 dark:border-emerald-900/50 dark:text-emerald-300">
+              <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+              <span>{t.budgetHealthyDesc}</span>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

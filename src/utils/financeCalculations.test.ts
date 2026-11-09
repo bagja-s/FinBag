@@ -12,9 +12,14 @@ import {
   calculateAutoBudget503020Summary,
   calculateNextRecurringDate,
   getDueRecurringOccurrences,
-  calculateMonthlyRecurringSummary,
+  getDatePeriodRange,
+  calculateFilteredTransactionsSummary,
+  calculateSixMonthCashFlowTrend,
+  getUpcomingRecurringBills,
+  calculateGoalProgressAndEta,
+  calculateDebtSummary,
 } from './financeCalculations';
-import { WalletAccount, Transaction, BudgetCategory, RecurringTransaction } from '../types/finance';
+import { WalletAccount, Transaction, BudgetCategory, RecurringTransaction, SavingsGoal, DebtRecord } from '../types/finance';
 
 test('formatCurrency correctly formats IDR with Rp prefix and thousands separators', () => {
   const result = formatCurrency(1500000, 'IDR');
@@ -174,6 +179,116 @@ test('getDueRecurringOccurrences collects due dates up to today and respects end
   assert.deepEqual(due.dueDates, ['2026-09-05', '2026-10-05']);
   assert.equal(due.updatedNextRunDate, '2026-11-05');
   assert.equal(due.shouldDeactivate, true);
+});
+
+test('getDatePeriodRange and calculateFilteredTransactionsSummary compute accurate date bounds and totals', () => {
+  const thisMonth = getDatePeriodRange('this_month', '2026-11-09');
+  assert.equal(thisMonth.startDate, '2026-11-01');
+  assert.equal(thisMonth.endDate, '2026-11-30');
+
+  const lastMonth = getDatePeriodRange('last_month', '2026-11-09');
+  assert.equal(lastMonth.startDate, '2026-10-01');
+  assert.equal(lastMonth.endDate, '2026-10-31');
+
+  const mockTxs: Transaction[] = [
+    { id: '1', date: '2026-11-02', amount: 8000000, currency: 'IDR', type: 'income', sourceWalletId: 'w1', description: 'Gaji' },
+    { id: '2', date: '2026-11-05', amount: 2500000, currency: 'IDR', type: 'expense', sourceWalletId: 'w1', description: 'Sewa' },
+    { id: '3', date: '2026-11-06', amount: 1000000, currency: 'IDR', type: 'transfer', sourceWalletId: 'w1', targetWalletId: 'w2', description: 'Tabung' },
+  ];
+
+  const summary = calculateFilteredTransactionsSummary(mockTxs);
+  assert.equal(summary.totalIncome, 8000000);
+  assert.equal(summary.totalExpense, 2500000);
+  assert.equal(summary.netCashFlow, 5500000);
+  assert.equal(summary.transferVolume, 1000000);
+  assert.equal(summary.count, 3);
+});
+
+test('calculateSixMonthCashFlowTrend returns 6 chronological months with savings rate', () => {
+  const mockTxs: Transaction[] = [
+    { id: '1', date: '2026-10-05', amount: 10000000, currency: 'IDR', type: 'income', sourceWalletId: 'w1', description: 'Gaji Okt' },
+    { id: '2', date: '2026-10-15', amount: 7500000, currency: 'IDR', type: 'expense', sourceWalletId: 'w1', description: 'Biaya Okt' },
+    { id: '3', date: '2026-11-05', amount: 10000000, currency: 'IDR', type: 'income', sourceWalletId: 'w1', description: 'Gaji Nov' },
+    { id: '4', date: '2026-11-10', amount: 6000000, currency: 'IDR', type: 'expense', sourceWalletId: 'w1', description: 'Biaya Nov' },
+  ];
+
+  const trend = calculateSixMonthCashFlowTrend(mockTxs, '2026-11');
+  assert.equal(trend.length, 6);
+  assert.equal(trend[0].monthKey, '2026-06');
+  assert.equal(trend[4].monthKey, '2026-10');
+  assert.equal(trend[4].savingsRatePercent, 25);
+  assert.equal(trend[5].monthKey, '2026-11');
+  assert.equal(trend[5].savingsRatePercent, 40);
+});
+
+test('getUpcomingRecurringBills identifies bills due within 7 days and checks wallet sufficiency', () => {
+  const wallets: WalletAccount[] = [
+    { id: 'w1', name: 'BCA', type: 'bank', balance: 100000, currency: 'IDR', color: '#3B82F6' },
+  ];
+  const rules: RecurringTransaction[] = [
+    {
+      id: 'r1',
+      description: 'Internet Fiber',
+      amount: 350000,
+      currency: 'IDR',
+      type: 'expense',
+      categoryId: 'utilities',
+      sourceWalletId: 'w1',
+      frequency: 'monthly',
+      startDate: '2026-01-12',
+      nextRunDate: '2026-11-12',
+      active: true,
+    },
+    {
+      id: 'r2',
+      description: 'Spotify',
+      amount: 55000,
+      currency: 'IDR',
+      type: 'expense',
+      categoryId: 'subscription',
+      sourceWalletId: 'w1',
+      frequency: 'monthly',
+      startDate: '2026-01-25',
+      nextRunDate: '2026-11-25',
+      active: true,
+    },
+  ];
+
+  const upcoming = getUpcomingRecurringBills(rules, wallets, '2026-11-09', 7);
+  assert.equal(upcoming.length, 1);
+  assert.equal(upcoming[0].rule.id, 'r1');
+  assert.equal(upcoming[0].daysUntilDue, 3);
+  assert.equal(upcoming[0].isBalanceSufficient, false);
+});
+
+test('calculateGoalProgressAndEta and calculateDebtSummary compute goal ETA and net debt position', () => {
+  const goal: SavingsGoal = {
+    id: 'g1',
+    title: 'Dana Darurat 6x',
+    targetAmount: 30000000,
+    currentAmount: 10000000,
+    currency: 'IDR',
+    color: '#10B981',
+    icon: 'Shield',
+  };
+
+  const eta = calculateGoalProgressAndEta(goal, 2000000);
+  assert.equal(eta.percentage, 33);
+  assert.equal(eta.remainingAmount, 20000000);
+  assert.equal(eta.estimatedMonths, 10);
+
+  const debts: DebtRecord[] = [
+    { id: 'd1', personName: 'Budi', title: 'Patungan Makan', type: 'receivable', amount: 500000, paidAmount: 0, currency: 'IDR', status: 'unpaid', createdAt: '2026-11-01' },
+    { id: 'd2', personName: 'Andi', title: 'Pinjam Cash', type: 'payable', amount: 200000, paidAmount: 0, currency: 'IDR', status: 'unpaid', createdAt: '2026-11-02' },
+    { id: 'd3', personName: 'Siti', title: 'Tiket Nonton', type: 'receivable', amount: 300000, paidAmount: 300000, currency: 'IDR', status: 'settled', createdAt: '2026-10-01' },
+  ];
+
+  const debtSum = calculateDebtSummary(debts);
+  assert.equal(debtSum.totalReceivable, 500000);
+  assert.equal(debtSum.totalPayable, 200000);
+  assert.equal(debtSum.netPosition, 300000);
+  assert.equal(debtSum.unpaidReceivableCount, 1);
+  assert.equal(debtSum.unpaidPayableCount, 1);
 });
 
 

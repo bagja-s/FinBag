@@ -22,7 +22,9 @@ import {
   Check,
   ShieldCheck,
   Settings,
-  TrendingUp
+  TrendingUp,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 
 export const TopBar: React.FC = () => {
@@ -40,6 +42,8 @@ export const TopBar: React.FC = () => {
     toggleTheme,
     appPin,
     lockApp,
+    isPrivacyMode,
+    togglePrivacyMode,
     exchangeRates,
     refreshExchangeRates,
     isRatesLoading
@@ -161,12 +165,35 @@ export const TopBar: React.FC = () => {
             {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-600" />}
           </button>
 
+          {/* Privacy Mode (Hide / Mask Balances) Quick Toggle */}
+          <button
+            type="button"
+            onClick={togglePrivacyMode}
+            title={
+              language === 'id'
+                ? isPrivacyMode
+                  ? 'Tampilkan Nominal Saldo'
+                  : 'Sensor Nominal Saldo (Mode Privasi)'
+                : isPrivacyMode
+                ? 'Show Balance Amounts'
+                : 'Hide Balance Amounts (Privacy Mode)'
+            }
+            aria-label={language === 'id' ? 'Sensor Nominal Saldo' : 'Toggle Privacy Masking'}
+            className={`hidden sm:flex h-8 w-8 items-center justify-center rounded-lg border transition-colors cursor-pointer ${
+              isPrivacyMode
+                ? 'border-amber-300 bg-amber-50 text-amber-600 dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-400'
+                : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300'
+            }`}
+          >
+            {isPrivacyMode ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+          </button>
+
           {/* App Lock PIN Quick Trigger */}
           {appPin && (
             <button
               onClick={lockApp}
               title={language === 'id' ? 'Kunci Aplikasi' : 'Lock Application'}
-              className="hidden sm:flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 transition-colors"
+              className="hidden sm:flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 transition-colors cursor-pointer"
             >
               <Lock className="w-4 h-4 text-rose-500" />
             </button>
@@ -506,8 +533,29 @@ export const TopBar: React.FC = () => {
               </div>
             </div>
 
-            {/* Quick Actions (Lock App & PWA) */}
+            {/* Quick Actions (Privacy Mode, Lock App & PWA) */}
             <div className="mt-3 space-y-2">
+              <button
+                type="button"
+                onClick={togglePrivacyMode}
+                className={`flex w-full items-center justify-center gap-2 rounded-xl border py-2.5 text-xs font-semibold transition-colors ${
+                  isPrivacyMode
+                    ? 'border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-800/50 dark:bg-amber-950/30 dark:text-amber-300'
+                    : 'border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-800 dark:bg-slate-800/60 dark:text-slate-200'
+                }`}
+              >
+                {isPrivacyMode ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                <span>
+                  {language === 'id'
+                    ? isPrivacyMode
+                      ? 'Mode Privasi Aktif (Tampilkan Saldo)'
+                      : 'Sensor Saldo (Mode Privasi)'
+                    : isPrivacyMode
+                    ? 'Privacy Mode Active (Show Balances)'
+                    : 'Hide Balances (Privacy Mode)'}
+                </span>
+              </button>
+
               {appPin && (
                 <button
                   onClick={() => {

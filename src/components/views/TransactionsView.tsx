@@ -5,7 +5,10 @@ import {
   formatCurrency, 
   filterTransactionsList, 
   groupTransactionsByDate,
-  calculateMonthlyRecurringSummary
+  calculateMonthlyRecurringSummary,
+  getDatePeriodRange,
+  calculateFilteredTransactionsSummary,
+  DatePeriodPreset
 } from '../../utils/financeCalculations';
 import { ConfirmationModal } from '../common/ConfirmationModal';
 import { 
@@ -62,6 +65,9 @@ export const TransactionsView: React.FC = () => {
   const [selectedWallet, setSelectedWallet] = useState('all');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedType, setSelectedType] = useState('all');
+  const [datePeriod, setDatePeriod] = useState<DatePeriodPreset>('all');
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
 
   // Recurring Manager UI state
   const [isRecurringExpanded, setIsRecurringExpanded] = useState<boolean>(true);
@@ -229,6 +235,12 @@ export const TransactionsView: React.FC = () => {
     return 'Yearly';
   };
 
+  const todayIsoStr = useMemo(() => new Date().toISOString().split('T')[0], []);
+
+  const periodRange = useMemo(() => {
+    return getDatePeriodRange(datePeriod, todayIsoStr, customStartDate, customEndDate);
+  }, [datePeriod, todayIsoStr, customStartDate, customEndDate]);
+
   // Filter and sort newest first
   const filtered = useMemo(() => {
     return filterTransactionsList(transactions, {
@@ -236,8 +248,14 @@ export const TransactionsView: React.FC = () => {
       walletId: selectedWallet,
       categoryId: selectedCategory,
       type: selectedType,
+      startDate: periodRange.startDate,
+      endDate: periodRange.endDate,
     });
-  }, [transactions, searchQuery, selectedWallet, selectedCategory, selectedType]);
+  }, [transactions, searchQuery, selectedWallet, selectedCategory, selectedType, periodRange]);
+
+  const filteredSummary = useMemo(() => {
+    return calculateFilteredTransactionsSummary(filtered, exchangeRates.rates, baseCurrency);
+  }, [filtered, exchangeRates.rates, baseCurrency]);
 
   // Group filtered transactions by date (newest date at the top, newest tx within date at the top)
   const dateGroups = useMemo(() => {
@@ -732,59 +750,138 @@ export const TransactionsView: React.FC = () => {
         )}
       </div>
 
-      {/* Filter Bar */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        {/* Search Input */}
-        <div className="flex items-center rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-800/80">
-          <Search className="h-4 w-4 text-slate-400 mr-2 shrink-0" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder={t.searchTransactions}
-            className="w-full bg-transparent text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none"
-          />
+      {/* Filter Bar (Search, Wallet, Category, Type, Date Period) */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm dark:border-slate-800 dark:bg-slate-900 space-y-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
+          {/* Search Input */}
+          <div className="flex items-center rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-800/80">
+            <Search className="h-4 w-4 text-slate-400 mr-2 shrink-0" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder={t.searchTransactions}
+              className="w-full bg-transparent text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none"
+            />
+          </div>
+
+          {/* Period Preset Filter */}
+          <select
+            value={datePeriod}
+            onChange={(e) => setDatePeriod(e.target.value as DatePeriodPreset)}
+            aria-label={language === 'id' ? 'Filter Periode Waktu' : 'Date Period Filter'}
+            className="h-10 rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-200 focus:outline-none cursor-pointer"
+          >
+            <option value="all">{language === 'id' ? 'Semua Periode Waktu' : 'All Time'}</option>
+            <option value="this_month">{language === 'id' ? 'Bulan Ini' : 'This Month'}</option>
+            <option value="last_month">{language === 'id' ? 'Bulan Lalu' : 'Last Month'}</option>
+            <option value="last_30_days">{language === 'id' ? '30 Hari Terakhir' : 'Last 30 Days'}</option>
+            <option value="custom">{language === 'id' ? 'Rentang Tanggal Kustom' : 'Custom Date Range'}</option>
+          </select>
+
+          {/* Wallet Filter */}
+          <select
+            value={selectedWallet}
+            onChange={(e) => setSelectedWallet(e.target.value)}
+            className="h-10 rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-200 focus:outline-none cursor-pointer"
+          >
+            <option value="all">{t.allWallets}</option>
+            {wallets.map((w) => (
+              <option key={w.id} value={w.id}>
+                {w.name}
+              </option>
+            ))}
+          </select>
+
+          {/* Category Filter */}
+          <select
+            value={selectedCategory}
+            onChange={(e) => setSelectedCategory(e.target.value)}
+            className="h-10 rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-200 focus:outline-none cursor-pointer"
+          >
+            <option value="all">{t.allCategories}</option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {language === 'en' ? c.nameEn : c.name}
+              </option>
+            ))}
+          </select>
+
+          {/* Type Filter */}
+          <select
+            value={selectedType}
+            onChange={(e) => setSelectedType(e.target.value)}
+            className="h-10 rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-200 focus:outline-none cursor-pointer"
+          >
+            <option value="all">{t.allTypes}</option>
+            <option value="expense">{t.typeExpense}</option>
+            <option value="income">{t.typeIncome}</option>
+            <option value="transfer">{t.typeTransfer}</option>
+          </select>
         </div>
 
-        {/* Wallet Filter */}
-        <select
-          value={selectedWallet}
-          onChange={(e) => setSelectedWallet(e.target.value)}
-          className="h-10 rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-200 focus:outline-none cursor-pointer"
-        >
-          <option value="all">{t.allWallets}</option>
-          {wallets.map((w) => (
-            <option key={w.id} value={w.id}>
-              {w.name}
-            </option>
-          ))}
-        </select>
+        {/* Custom Date Range Pickers */}
+        {datePeriod === 'custom' && (
+          <div className="flex flex-wrap items-center gap-2.5 pt-2 border-t border-slate-100 dark:border-slate-800">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                {language === 'id' ? 'Dari:' : 'From:'}
+              </span>
+              <input
+                type="date"
+                value={customStartDate}
+                onChange={(e) => setCustomStartDate(e.target.value)}
+                className="h-9 rounded-lg border border-slate-200 bg-slate-50 px-2.5 text-xs font-semibold text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 focus:outline-none"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                {language === 'id' ? 'Sampai:' : 'To:'}
+              </span>
+              <input
+                type="date"
+                value={customEndDate}
+                onChange={(e) => setCustomEndDate(e.target.value)}
+                className="h-9 rounded-lg border border-slate-200 bg-slate-50 px-2.5 text-xs font-semibold text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 focus:outline-none"
+              />
+            </div>
+          </div>
+        )}
 
-        {/* Category Filter */}
-        <select
-          value={selectedCategory}
-          onChange={(e) => setSelectedCategory(e.target.value)}
-          className="h-10 rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-200 focus:outline-none cursor-pointer"
-        >
-          <option value="all">{t.allCategories}</option>
-          {categories.map((c) => (
-            <option key={c.id} value={c.id}>
-              {language === 'en' ? c.nameEn : c.name}
-            </option>
-          ))}
-        </select>
-
-        {/* Type Filter */}
-        <select
-          value={selectedType}
-          onChange={(e) => setSelectedType(e.target.value)}
-          className="h-10 rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-200 focus:outline-none cursor-pointer"
-        >
-          <option value="all">{t.allTypes}</option>
-          <option value="expense">{t.typeExpense}</option>
-          <option value="income">{t.typeIncome}</option>
-          <option value="transfer">{t.typeTransfer}</option>
-        </select>
+        {/* Filtered Cash Flow Summary Strip */}
+        {filtered.length > 0 && (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-2.5 border-t border-slate-100 dark:border-slate-800">
+            <div className="flex items-center justify-between rounded-xl bg-emerald-50/70 px-3 py-2 dark:bg-emerald-950/30">
+              <span className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">
+                {language === 'id' ? 'Total Pemasukan (Filter)' : 'Filtered Income'}
+              </span>
+              <span className="font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">
+                +{formatCurrency(filteredSummary.totalIncome, baseCurrency)}
+              </span>
+            </div>
+            <div className="flex items-center justify-between rounded-xl bg-rose-50/70 px-3 py-2 dark:bg-rose-950/30">
+              <span className="text-[11px] font-semibold text-rose-700 dark:text-rose-300">
+                {language === 'id' ? 'Total Pengeluaran (Filter)' : 'Filtered Expense'}
+              </span>
+              <span className="font-mono text-xs font-bold text-rose-600 dark:text-rose-400 tabular-nums">
+                -{formatCurrency(filteredSummary.totalExpense, baseCurrency)}
+              </span>
+            </div>
+            <div className="flex items-center justify-between rounded-xl bg-slate-100/80 px-3 py-2 dark:bg-slate-800/70">
+              <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+                {language === 'id' ? 'Selisih Bersih (Net)' : 'Net Cash Flow'}
+              </span>
+              <span className={`font-mono text-xs font-bold tabular-nums ${
+                filteredSummary.netCashFlow >= 0
+                  ? 'text-emerald-600 dark:text-emerald-400'
+                  : 'text-rose-600 dark:text-rose-400'
+              }`}>
+                {filteredSummary.netCashFlow >= 0 ? '+' : ''}
+                {formatCurrency(filteredSummary.netCashFlow, baseCurrency)}
+              </span>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Grouped Transactions List by Date */}

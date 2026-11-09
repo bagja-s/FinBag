@@ -7,7 +7,7 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
-    // Helper functions
+    // Core Authentication & Identity Helpers
     function isSignedIn() {
       return request.auth != null;
     }
@@ -17,20 +17,45 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return isSignedIn() && request.auth.token.email == 'sm.bagja@gmail.com' && request.auth.token.email_verified == true;
+      return isSignedIn() &&
+        request.auth.token.email == 'sm.bagja@gmail.com' &&
+        request.auth.token.email_verified == true;
+    }
+
+    // Server-side suspension enforcement: suspended users cannot mutate data
+    function isNotSuspended(userId) {
+      return isAdmin() ||
+        !exists(/databases/$(database)/documents/users/$(userId)) ||
+        get(/databases/$(database)/documents/users/$(userId)).data.get('status', 'active') != 'suspended';
     }
 
     function isValidId(id) {
-      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidAmount(val, allowZero) {
+      return val is number &&
+        (allowZero ? val >= 0 : val > 0) &&
+        val <= 1000000000000000;
+    }
+
+    function isValidBalance(val) {
+      return val is number &&
+        val >= -1000000000000000 &&
+        val <= 1000000000000000;
     }
 
     function incoming() {
       return request.resource.data;
     }
 
-    function isValidProfile(data) {
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidProfile(data, userId) {
       return data.keys().hasAll(['uid', 'email']) &&
-        data.uid is string && data.uid.size() <= 128 &&
+        data.uid is string && data.uid == userId && data.uid.size() <= 128 &&
         data.email is string && data.email.size() <= 200 &&
         (!('displayName' in data) || (data.displayName is string && data.displayName.size() <= 150)) &&
         (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() <= 500)) &&
@@ -40,38 +65,60 @@ service cloud.firestore {
         (!('language' in data) || (data.language is string && data.language.size() <= 10));
     }
 
+    // Prevent non-admin users from escalating their own role or unsuspending themselves
+    function isSafeProfileRoleOnCreate(data) {
+      return isAdmin() || (
+        (!('role' in data) || data.role == 'user') &&
+        (!('status' in data) || data.status == 'active')
+      );
+    }
+
+    function isSafeProfileRoleOnUpdate(data, prev) {
+      return isAdmin() || (
+        (!('role' in data) || data.role == prev.get('role', 'user')) &&
+        (!('status' in data) || data.status == prev.get('status', 'active')) &&
+        data.uid == prev.uid
+      );
+    }
+
     function isValidWallet(data, userId) {
       return data.keys().hasAll(['name', 'type', 'balance', 'currency', 'userId']) &&
         data.userId == userId &&
         data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
         data.type in ['cash', 'bank', 'ewallet', 'credit', 'investment'] &&
-        data.balance is number &&
-        (!('initialBalance' in data) || data.initialBalance is number) &&
-        data.currency is string && data.currency.size() <= 5;
+        isValidBalance(data.balance) &&
+        (!('initialBalance' in data) || isValidBalance(data.initialBalance)) &&
+        data.currency is string && data.currency.size() <= 5 &&
+        (!('color' in data) || (data.color is string && data.color.size() <= 30));
     }
 
     function isValidTransaction(data, userId) {
       return data.keys().hasAll(['date', 'amount', 'currency', 'type', 'sourceWalletId', 'description', 'userId']) &&
         data.userId == userId &&
         data.date is string && data.date.size() <= 20 &&
-        data.amount is number &&
+        isValidAmount(data.amount, false) &&
         data.currency is string && data.currency.size() <= 5 &&
         data.type in ['expense', 'income', 'transfer'] &&
         data.sourceWalletId is string && data.sourceWalletId.size() <= 128 &&
-        data.description is string && data.description.size() <= 200;
+        (!('targetWalletId' in data) || (data.targetWalletId is string && data.targetWalletId.size() <= 128)) &&
+        (!('categoryId' in data) || (data.categoryId is string && data.categoryId.size() <= 100)) &&
+        data.description is string && data.description.size() <= 200 &&
+        (!('notes' in data) || (data.notes is string && data.notes.size() <= 500));
     }
 
     function isValidRecurringTransaction(data, userId) {
       return data.keys().hasAll(['description', 'amount', 'currency', 'type', 'sourceWalletId', 'frequency', 'startDate', 'nextRunDate', 'active', 'userId']) &&
         data.userId == userId &&
         data.description is string && data.description.size() <= 200 &&
-        data.amount is number &&
+        isValidAmount(data.amount, false) &&
         data.currency is string && data.currency.size() <= 5 &&
         data.type in ['expense', 'income', 'transfer'] &&
         data.sourceWalletId is string && data.sourceWalletId.size() <= 128 &&
+        (!('targetWalletId' in data) || (data.targetWalletId is string && data.targetWalletId.size() <= 128)) &&
         data.frequency in ['daily', 'weekly', 'monthly', 'yearly'] &&
         data.startDate is string && data.startDate.size() <= 20 &&
         data.nextRunDate is string && data.nextRunDate.size() <= 20 &&
+        (!('endDate' in data) || (data.endDate is string && data.endDate.size() <= 20)) &&
         data.active is bool;
     }
 
@@ -79,24 +126,38 @@ service cloud.firestore {
       return data.keys().hasAll(['categoryName', 'monthlyLimit', 'currency', 'userId']) &&
         data.userId == userId &&
         data.categoryName is string && data.categoryName.size() <= 100 &&
-        data.monthlyLimit is number &&
+        isValidAmount(data.monthlyLimit, true) &&
         data.currency is string && data.currency.size() <= 5;
     }
 
     function isValidGoal(data, userId) {
       return data.keys().hasAll(['title', 'targetAmount', 'currentAmount', 'currency', 'userId']) &&
         data.userId == userId &&
-        data.title is string && data.title.size() <= 100 &&
-        data.targetAmount is number &&
-        data.currentAmount is number &&
-        data.currency is string && data.currency.size() <= 5;
+        data.title is string && data.title.size() > 0 && data.title.size() <= 100 &&
+        isValidAmount(data.targetAmount, false) &&
+        isValidAmount(data.currentAmount, true) &&
+        data.currency is string && data.currency.size() <= 5 &&
+        (!('deadline' in data) || (data.deadline is string && data.deadline.size() <= 30));
+    }
+
+    function isValidDebt(data, userId) {
+      return data.keys().hasAll(['type', 'personName', 'title', 'amount', 'currency', 'status', 'userId']) &&
+        data.userId == userId &&
+        data.type in ['payable', 'receivable'] &&
+        data.personName is string && data.personName.size() > 0 && data.personName.size() <= 100 &&
+        data.title is string && data.title.size() > 0 && data.title.size() <= 150 &&
+        isValidAmount(data.amount, false) &&
+        (!('paidAmount' in data) || (isValidAmount(data.paidAmount, true) && data.paidAmount <= data.amount)) &&
+        data.currency is string && data.currency.size() <= 5 &&
+        data.status in ['unpaid', 'settled'] &&
+        (!('notes' in data) || (data.notes is string && data.notes.size() <= 500));
     }
 
     function isValidAuditLog(data, userId) {
       return data.keys().hasAll(['userId', 'timestamp', 'action', 'entity', 'summary']) &&
         data.userId == userId &&
         data.action in ['CREATE', 'UPDATE', 'DELETE', 'TRANSFER', 'CLEAR'] &&
-        data.entity in ['TRANSACTION', 'WALLET', 'GOAL', 'BUDGET', 'DATABASE', 'SECURITY'] &&
+        data.entity in ['TRANSACTION', 'WALLET', 'GOAL', 'BUDGET', 'DEBT', 'DATABASE', 'SECURITY'] &&
         data.summary is string && data.summary.size() <= 250 &&
         data.timestamp is string && data.timestamp.size() <= 50;
     }
@@ -105,43 +166,56 @@ service cloud.firestore {
     match /users/{userId} {
       allow get: if isOwner(userId) || isAdmin();
       allow list: if isAdmin();
-      allow create: if isOwner(userId) && isValidId(userId) && isValidProfile(incoming());
-      allow update: if (isOwner(userId) && isValidId(userId) && isValidProfile(incoming())) || isAdmin();
+      allow create: if isOwner(userId) && isValidId(userId) && isValidProfile(incoming(), userId) && isSafeProfileRoleOnCreate(incoming());
+      allow update: if (isOwner(userId) && isValidId(userId) && isNotSuspended(userId) && isValidProfile(incoming(), userId) && isSafeProfileRoleOnUpdate(incoming(), existing())) || isAdmin();
       allow delete: if (isOwner(userId) || isAdmin()) && isValidId(userId);
 
       // Wallets subcollection
       match /wallets/{walletId} {
         allow read: if isOwner(userId) || isAdmin();
-        allow create, update: if isOwner(userId) && isValidId(walletId) && isValidWallet(incoming(), userId);
-        allow delete: if (isOwner(userId) || isAdmin()) && isValidId(walletId);
+        allow create: if isOwner(userId) && isNotSuspended(userId) && isValidId(walletId) && isValidWallet(incoming(), userId);
+        allow update: if isOwner(userId) && isNotSuspended(userId) && isValidId(walletId) && isValidWallet(incoming(), userId) && incoming().userId == existing().userId;
+        allow delete: if (isOwner(userId) || isAdmin()) && isNotSuspended(userId) && isValidId(walletId);
       }
 
       // Transactions subcollection
       match /transactions/{transactionId} {
         allow read: if isOwner(userId) || isAdmin();
-        allow create, update: if isOwner(userId) && isValidId(transactionId) && isValidTransaction(incoming(), userId);
-        allow delete: if (isOwner(userId) || isAdmin()) && isValidId(transactionId);
+        allow create: if isOwner(userId) && isNotSuspended(userId) && isValidId(transactionId) && isValidTransaction(incoming(), userId);
+        allow update: if isOwner(userId) && isNotSuspended(userId) && isValidId(transactionId) && isValidTransaction(incoming(), userId) && incoming().userId == existing().userId;
+        allow delete: if (isOwner(userId) || isAdmin()) && isNotSuspended(userId) && isValidId(transactionId);
       }
 
       // Recurring transactions subcollection
       match /recurring_transactions/{recurringId} {
         allow read: if isOwner(userId) || isAdmin();
-        allow create, update: if isOwner(userId) && isValidId(recurringId) && isValidRecurringTransaction(incoming(), userId);
-        allow delete: if (isOwner(userId) || isAdmin()) && isValidId(recurringId);
+        allow create: if isOwner(userId) && isNotSuspended(userId) && isValidId(recurringId) && isValidRecurringTransaction(incoming(), userId);
+        allow update: if isOwner(userId) && isNotSuspended(userId) && isValidId(recurringId) && isValidRecurringTransaction(incoming(), userId) && incoming().userId == existing().userId;
+        allow delete: if (isOwner(userId) || isAdmin()) && isNotSuspended(userId) && isValidId(recurringId);
       }
 
       // Budgets subcollection
       match /budgets/{budgetId} {
         allow read: if isOwner(userId) || isAdmin();
-        allow create, update: if isOwner(userId) && isValidId(budgetId) && isValidBudget(incoming(), userId);
-        allow delete: if (isOwner(userId) || isAdmin()) && isValidId(budgetId);
+        allow create: if isOwner(userId) && isNotSuspended(userId) && isValidId(budgetId) && isValidBudget(incoming(), userId);
+        allow update: if isOwner(userId) && isNotSuspended(userId) && isValidId(budgetId) && isValidBudget(incoming(), userId) && incoming().userId == existing().userId;
+        allow delete: if (isOwner(userId) || isAdmin()) && isNotSuspended(userId) && isValidId(budgetId);
       }
 
       // Goals subcollection
       match /goals/{goalId} {
         allow read: if isOwner(userId) || isAdmin();
-        allow create, update: if isOwner(userId) && isValidId(goalId) && isValidGoal(incoming(), userId);
-        allow delete: if (isOwner(userId) || isAdmin()) && isValidId(goalId);
+        allow create: if isOwner(userId) && isNotSuspended(userId) && isValidId(goalId) && isValidGoal(incoming(), userId);
+        allow update: if isOwner(userId) && isNotSuspended(userId) && isValidId(goalId) && isValidGoal(incoming(), userId) && incoming().userId == existing().userId;
+        allow delete: if (isOwner(userId) || isAdmin()) && isNotSuspended(userId) && isValidId(goalId);
+      }
+
+      // Debts subcollection
+      match /debts/{debtId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow create: if isOwner(userId) && isNotSuspended(userId) && isValidId(debtId) && isValidDebt(incoming(), userId);
+        allow update: if isOwner(userId) && isNotSuspended(userId) && isValidId(debtId) && isValidDebt(incoming(), userId) && incoming().userId == existing().userId;
+        allow delete: if (isOwner(userId) || isAdmin()) && isNotSuspended(userId) && isValidId(debtId);
       }
 
       // Audit logs subcollection (Immutable audit trail: allow read and create only)
