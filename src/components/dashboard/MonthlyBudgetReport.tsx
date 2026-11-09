@@ -348,6 +348,15 @@ export const MonthlyBudgetReport: React.FC = () => {
               <ChevronRight className="h-4 w-4" />
             </button>
           </div>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('budgets')}
+            className="flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-blue-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-blue-400 dark:hover:bg-slate-700/70 transition-colors cursor-pointer whitespace-nowrap"
+          >
+            <Target className="h-3.5 w-3.5" />
+            <span>{t.configureBudgets}</span>
+          </button>
         </div>
       </div>
 

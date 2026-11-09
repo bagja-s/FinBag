@@ -52,7 +52,6 @@ export const TransactionsView: React.FC = () => {
     toggleRecurringTransaction,
     executeRecurringTransactionNow,
     exportCSV, 
-    exportJSON, 
     setIsTransactionModalOpen,
     language 
   } = useFinance();
@@ -290,7 +289,7 @@ export const TransactionsView: React.FC = () => {
 
   return (
     <div className="space-y-6 pb-20 lg:pb-8">
-      {/* Header with Export CTA */}
+      {/* Header with Primary Action & CSV Export */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
@@ -304,25 +303,12 @@ export const TransactionsView: React.FC = () => {
 
         <div className="flex flex-wrap items-center gap-2">
           <button
-            onClick={openCreateRecurringForm}
-            className="flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3.5 py-2 text-xs font-bold text-white shadow-sm hover:bg-indigo-500 transition-colors cursor-pointer whitespace-nowrap"
-          >
-            <Repeat className="h-3.5 w-3.5" />
-            <span>{language === 'id' ? '+ Buat Jadwal Otomatis' : '+ Add Recurring'}</span>
-          </button>
-          <button
+            type="button"
             onClick={exportCSV}
             className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 transition-colors cursor-pointer whitespace-nowrap"
           >
             <Download className="h-3.5 w-3.5 text-blue-500" />
             <span>{t.exportCSV}</span>
-          </button>
-          <button
-            onClick={exportJSON}
-            className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 transition-colors cursor-pointer whitespace-nowrap"
-          >
-            <Download className="h-3.5 w-3.5 text-emerald-500" />
-            <span>{t.exportJSON}</span>
           </button>
         </div>
       </div>
@@ -364,10 +350,18 @@ export const TransactionsView: React.FC = () => {
             )}
             <button
               type="button"
-              onClick={() => setIsRecurringExpanded((prev) => !prev)}
-              className="flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 cursor-pointer"
+              onClick={openCreateRecurringForm}
+              className="flex items-center gap-1 rounded-xl bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-indigo-500 transition-colors cursor-pointer whitespace-nowrap"
             >
-              <span>{isRecurringExpanded ? (language === 'id' ? 'Sembunyikan' : 'Hide') : (language === 'id' ? 'Kelola Jadwal' : 'Manage')}</span>
+              <Plus className="h-3.5 w-3.5" />
+              <span>{language === 'id' ? 'Jadwal Baru' : 'New Schedule'}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsRecurringExpanded((prev) => !prev)}
+              className="flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 cursor-pointer"
+              title={isRecurringExpanded ? (language === 'id' ? 'Sembunyikan' : 'Hide') : (language === 'id' ? 'Tampilkan' : 'Show')}
+            >
               {isRecurringExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
             </button>
           </div>
@@ -600,22 +594,13 @@ export const TransactionsView: React.FC = () => {
 
             {/* List of Recurring Schedules */}
             {recurringTransactions.length === 0 ? (
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-dashed border-slate-200 bg-white/80 p-4 dark:border-slate-800 dark:bg-slate-900/60">
-                <div className="flex items-center gap-2.5 text-xs text-slate-500 dark:text-slate-400">
-                  <Clock className="h-4 w-4 text-slate-400 shrink-0" />
-                  <span>
-                    {language === 'id'
-                      ? 'Belum ada jadwal transaksi berulang. Buat jadwal untuk gaji bulanan, tagihan listrik/internet, atau langganan aplikasi.'
-                      : 'No automatic recurring schedules yet. Add schedules for monthly salary, utility bills, or subscriptions.'}
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={openCreateRecurringForm}
-                  className="shrink-0 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-indigo-500 cursor-pointer"
-                >
-                  {language === 'id' ? '+ Buat Jadwal' : '+ Create Schedule'}
-                </button>
+              <div className="flex items-center gap-2.5 rounded-xl border border-dashed border-slate-200 bg-white/80 p-3.5 text-xs text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
+                <Clock className="h-4 w-4 text-slate-400 shrink-0" />
+                <span>
+                  {language === 'id'
+                    ? 'Belum ada jadwal transaksi berulang. Klik "+ Jadwal Baru" di atas untuk menjadwalkan gaji bulanan, tagihan rutin, atau langganan.'
+                    : 'No automatic recurring schedules yet. Click "+ New Schedule" above to schedule monthly salary, utility bills, or subscriptions.'}
+                </span>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

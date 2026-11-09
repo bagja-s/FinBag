@@ -4,16 +4,13 @@ import { getTranslation } from '../../i18n/translations';
 import { 
   formatCurrency, 
   calculateNetWorth, 
-  calculateMonthlyCashFlow, 
-  calculateCategorySpending, 
-  calculateBudgetHealth 
+  calculateMonthlyCashFlow
 } from '../../utils/financeCalculations';
 import { 
   Wallet, 
   ArrowUpRight, 
   ArrowDownLeft, 
   Plus, 
-  TrendingUp, 
   ChevronRight, 
   CreditCard,
   Edit3,
@@ -34,7 +31,6 @@ export const DashboardView: React.FC = () => {
     baseCurrency, 
     exchangeRates, 
     setActiveTab, 
-    setIsTransactionModalOpen, 
     setIsAddWalletModalOpen, 
     openWalletDetail,
     openEditTransaction,
@@ -50,15 +46,8 @@ export const DashboardView: React.FC = () => {
   const currentMonthStr = new Date().toISOString().slice(0, 7); // YYYY-MM
   const netWorth = calculateNetWorth(wallets, exchangeRates.rates, baseCurrency);
   const cashFlow = calculateMonthlyCashFlow(transactions, currentMonthStr, exchangeRates.rates, baseCurrency);
-  const categorySpending = calculateCategorySpending(transactions, currentMonthStr, exchangeRates.rates, baseCurrency);
 
   const recentTxs = transactions.slice(0, 5);
-
-  // Calculate donut chart segments
-  const totalSpent = Object.values(categorySpending).reduce((a, b) => a + b, 0);
-  const topCategories = Object.entries(categorySpending)
-    .sort(([, a], [, b]) => b - a)
-    .slice(0, 4);
 
   return (
     <div className="space-y-6 pb-20 lg:pb-8">
@@ -172,106 +161,6 @@ export const DashboardView: React.FC = () => {
 
       {/* 3. Monthly Financial Summary Report (Recharts Spending vs Budget) */}
       <MonthlyBudgetReport />
-
-      {/* 4. Budget Status & Category Spending Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Spending Allocation */}
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-            <h3 className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-              <TrendingUp className="h-4 w-4 text-emerald-500" />
-              <span>{t.spendingByCategory}</span>
-            </h3>
-            <span className="text-xs font-mono font-bold text-slate-500 tabular-nums">
-              Total: {formatCurrency(totalSpent, baseCurrency)}
-            </span>
-          </div>
-
-          {topCategories.length === 0 ? (
-            <p className="mt-6 text-center text-xs text-slate-400 py-6">{t.noTransactionsYet}</p>
-          ) : (
-            <div className="mt-4 space-y-3">
-              {topCategories.map(([catId, amount]) => {
-                const category = categories.find((c) => c.id === catId);
-                const catName = category ? (language === 'en' ? category.nameEn : category.name) : catId;
-                const percentage = totalSpent > 0 ? Math.round((amount / totalSpent) * 100) : 0;
-                return (
-                  <div key={catId} className="space-y-1">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-medium text-slate-700 dark:text-slate-300">{catName}</span>
-                      <span className="font-mono font-semibold text-slate-900 dark:text-white tabular-nums">
-                        {formatCurrency(amount, baseCurrency)} ({percentage}%)
-                      </span>
-                    </div>
-                    <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-                      <div
-                        className="h-full rounded-full transition-all"
-                        style={{
-                          width: `${percentage}%`,
-                          backgroundColor: category?.color || '#3B82F6',
-                        }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* Budget Health Overview */}
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-            <h3 className="text-xs font-bold text-slate-900 dark:text-white">
-              {t.budgetStatus}
-            </h3>
-            <button
-              onClick={() => setActiveTab('budgets')}
-              className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-0.5"
-            >
-              <span>{t.viewAll}</span>
-              <ChevronRight className="h-3 w-3" />
-            </button>
-          </div>
-
-          <div className="mt-4 space-y-3">
-            {categories.filter(c => c.monthlyLimit > 0).slice(0, 3).map((cat) => {
-              const spent = categorySpending[cat.id] || 0;
-              const health = calculateBudgetHealth(spent, cat.monthlyLimit);
-              const catName = language === 'en' ? cat.nameEn : cat.name;
-
-              return (
-                <div key={cat.id} className="space-y-1">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-medium text-slate-700 dark:text-slate-300">{catName}</span>
-                    <span className={`font-mono text-[11px] font-bold tabular-nums ${
-                      health.status === 'danger'
-                        ? 'text-rose-500'
-                        : health.status === 'warning'
-                        ? 'text-amber-500'
-                        : 'text-emerald-500'
-                    }`}>
-                      {health.percentage}% · {health.status === 'danger' ? t.overBudget : health.status === 'warning' ? t.nearLimit : t.withinBudget}
-                    </span>
-                  </div>
-                  <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-                    <div
-                      className={`h-full rounded-full transition-all ${
-                        health.status === 'danger'
-                          ? 'bg-rose-500'
-                          : health.status === 'warning'
-                          ? 'bg-amber-500'
-                          : 'bg-emerald-500'
-                      }`}
-                      style={{ width: `${Math.min(100, health.percentage)}%` }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
 
       {/* 4. Recent Transactions Table */}
       <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
