@@ -21,7 +21,10 @@ import {
   SlidersHorizontal,
   Check,
   ShieldCheck,
-  Settings
+  Settings,
+  TrendingUp,
+  PieChart,
+  History
 } from 'lucide-react';
 
 export const TopBar: React.FC = () => {
@@ -259,30 +262,42 @@ export const TopBar: React.FC = () => {
             )}
           </div>
 
-          {/* ================= MOBILE CONTROLS (Single Clean Trigger) ================= */}
-          <div className="sm:hidden">
+          {/* ================= MOBILE CONTROLS (Live Rates Ticker + Menu Trigger) ================= */}
+          <div className="flex items-center gap-1.5 sm:hidden">
+            {/* Mobile 1-Tap FX Ticker Button */}
+            <button
+              onClick={() => setActiveTab('rates')}
+              title={t.navRates}
+              className="flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2 text-[11px] font-semibold text-slate-700 active:scale-95 dark:border-slate-800 dark:bg-slate-850 dark:text-slate-200 transition-transform cursor-pointer"
+            >
+              <TrendingUp className="w-3.5 h-3.5 text-emerald-500" />
+              <span className="font-mono text-emerald-600 dark:text-emerald-400">
+                ${usdToIdr.split('.')[0] || usdToIdr}
+              </span>
+            </button>
+
             {user ? (
               <button
                 onClick={() => setShowMobileMenu(true)}
                 aria-label={language === 'id' ? 'Buka Menu Preferensi dan Akun' : 'Open Preferences & Account'}
-                className="flex h-9 items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 p-1 pr-2 text-xs font-medium text-slate-700 active:scale-95 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 transition-transform"
+                className="flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 p-1 pr-2 text-xs font-medium text-slate-700 active:scale-95 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 transition-transform cursor-pointer"
               >
                 {user.photoURL ? (
-                  <img src={user.photoURL} alt="" className="h-7 w-7 rounded-lg object-cover ring-1 ring-blue-500/30" />
+                  <img src={user.photoURL} alt="" className="h-6 w-6 rounded-md object-cover ring-1 ring-blue-500/30" />
                 ) : (
-                  <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-600 text-xs font-bold text-white shadow-sm">
+                  <div className="flex h-6 w-6 items-center justify-center rounded-md bg-blue-600 text-xs font-bold text-white shadow-sm">
                     {user.displayName?.[0] || 'U'}
                   </div>
                 )}
-                <SlidersHorizontal className="w-3.5 h-3.5 text-slate-400 ml-0.5" />
+                <SlidersHorizontal className="w-3 h-3 text-slate-400 ml-0.5" />
               </button>
             ) : (
               <button
                 onClick={() => setShowMobileMenu(true)}
                 aria-label={language === 'id' ? 'Buka Menu Preferensi dan Masuk' : 'Open Preferences & Sign In'}
-                className="flex h-9 items-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50/80 px-2.5 text-xs font-semibold text-blue-600 active:scale-95 dark:border-blue-900/50 dark:bg-blue-950/40 dark:text-blue-400 transition-transform"
+                className="flex h-8 items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50/80 px-2.5 text-xs font-semibold text-blue-600 active:scale-95 dark:border-blue-900/50 dark:bg-blue-950/40 dark:text-blue-400 transition-transform cursor-pointer"
               >
-                <UserIcon className="w-4 h-4" />
+                <UserIcon className="w-3.5 h-3.5" />
                 <span>{language === 'id' ? 'Masuk' : 'Sign In'}</span>
               </button>
             )}
@@ -415,6 +430,54 @@ export const TopBar: React.FC = () => {
                   </button>
                 </div>
               )}
+            </div>
+
+            {/* Mobile Quick Feature Links (Direct access to Budgets, Live Rates, etc.) */}
+            <div className="mt-4">
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-2 block">
+                {language === 'id' ? 'Akses Cepat Fitur' : 'Quick Access Features'}
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => {
+                    setActiveTab('budgets');
+                    setShowMobileMenu(false);
+                  }}
+                  className="flex items-center gap-2.5 rounded-xl border border-blue-100 bg-blue-50/60 p-2.5 text-left active:scale-[0.98] dark:border-blue-900/40 dark:bg-blue-950/30 transition-transform cursor-pointer"
+                >
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white">
+                    <PieChart className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                      {t.navBudgets}
+                    </p>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
+                      {language === 'id' ? 'Pagu & Batas Belanja' : 'Spending Limits'}
+                    </p>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setActiveTab('rates');
+                    setShowMobileMenu(false);
+                  }}
+                  className="flex items-center gap-2.5 rounded-xl border border-emerald-100 bg-emerald-50/60 p-2.5 text-left active:scale-[0.98] dark:border-emerald-900/40 dark:bg-emerald-950/30 transition-transform cursor-pointer"
+                >
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-600 text-white">
+                    <TrendingUp className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                      {t.navRates}
+                    </p>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
+                      {language === 'id' ? 'Konversi & Valas' : 'FX & Converter'}
+                    </p>
+                  </div>
+                </button>
+              </div>
             </div>
 
             {/* Base Currency Selection */}

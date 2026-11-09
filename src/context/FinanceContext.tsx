@@ -349,7 +349,33 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [categories, setCategories] = useState<BudgetCategory[]>(() => {
     const saved = localStorage.getItem(`${LOCAL_STORAGE_PREFIX}categories`);
-    return saved ? JSON.parse(saved) : INITIAL_CATEGORIES;
+    if (!saved) return INITIAL_CATEGORIES;
+    try {
+      const parsed: BudgetCategory[] = JSON.parse(saved);
+      // Ensure all 24 categories from INITIAL_CATEGORIES are present, preserving custom limits from saved
+      const savedMap = new Map(parsed.map((c) => [c.id, c]));
+      const merged: BudgetCategory[] = INITIAL_CATEGORIES.map((cat) => {
+        const existing = savedMap.get(cat.id);
+        if (existing) {
+          return {
+            ...cat,
+            monthlyLimit: typeof existing.monthlyLimit === 'number' ? existing.monthlyLimit : cat.monthlyLimit,
+            color: existing.color || cat.color,
+            icon: existing.icon || cat.icon,
+          };
+        }
+        return cat;
+      });
+      // Also retain any custom user-added categories not in INITIAL_CATEGORIES
+      parsed.forEach((c) => {
+        if (!merged.some((m) => m.id === c.id)) {
+          merged.push(c);
+        }
+      });
+      return merged;
+    } catch {
+      return INITIAL_CATEGORIES;
+    }
   });
   const [goals, setGoals] = useState<SavingsGoal[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);

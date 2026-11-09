@@ -1,73 +1,64 @@
-# Implementation Plan - Minimalist White-Background Icon & Full English Localization
+# Rangkuman Pembaruan FinBag: Kategori Transaksi & Akses Menu Mobile
 
-## 1. Icon Minimalis Ber-background Putih
-- [x] Mendesain ulang `public/icon.svg`:
-  - Background: Putih bersih (`#FFFFFF`) dengan sudut melengkung halus (`rx="120"`) dan garis tepi lembut (`#E2E8F0`).
-  - Lambang FinBag: Siluet dompet/tas modern geometris berwarna biru royal/indigo elegan (`#2563EB`, `#1E3A8A`), lipatan flap geometris clean, serta aksen permata/koin pertumbuhan hijau emerald (`#10B981`, `#059669`).
-- [x] Mengonversi dan merender aset PNG beresolusi tinggi yang sinkron:
-  - `public/apple-touch-icon.png` (180x180)
-  - `public/pwa-192x192.png` (192x192)
-  - `public/pwa-512x512.png` (512x512)
-- [x] Memperbarui brand wordmark badge di:
-  - Header utama (`TopBar.tsx`): menampilkan `/icon.svg` minimalis putih berbingkai rapi.
-  - Halaman login (`LoginView.tsx`): logo minimalis berlatar putih dengan bayangan elegan.
-  - Loading screen (`App.tsx`): icon `/icon.svg` animasi halus.
-  - PWA manifest (`vite.config.ts`): disesuaikan `background_color: '#FFFFFF'`.
+## 1. Perluasan Kategori Transaksi (24 Kategori Lengkap)
+Kategori transaksi telah diperluas dari sebelumnya 8 kategori menjadi **24 kategori komprehensif** untuk pencatatan keuangan pribadi dan bisnis yang mendalam:
 
-## 2. Pengecekan & Perbaikan Menyeluruh Bahasa Inggris (100% Bilingual)
-- [x] **App.tsx**:
-  - Loading session: "Memuat sesi FinBag..." / "Loading FinBag session..."
-  - Tombol sign-out suspended: "Keluar dari Akun" / "Sign Out"
-  - Notifikasi offline: "Mode Offline — Perubahan akan disinkronkan ke Firestore saat online kembali." / "Offline Mode — Changes will sync to Firestore once back online."
-- [x] **TopBar.tsx**:
-  - Tombol masuk: "Masuk" / "Sign In"
-  - Tooltip & aria-label (Mata uang utama, ganti bahasa, tema, kunci aplikasi).
-  - Modal panduan instalasi iOS Safari ("Panduan Pasang di iPhone/iPad" / "Install Guide on iPhone/iPad" beserta langkah-langkah dan tombol tutup).
-- [x] **DashboardView.tsx**:
-  - Modal konfirmasi hapus transaksi: "Hapus Transaksi" / "Delete Transaction", label detail ("Description", "Amount", "Date").
-  - Tooltip tombol Edit & Hapus transaksi.
-- [x] **WalletsView.tsx**:
-  - Detail konfirmasi hapus rekening: "Nama Akun" / "Account Name", "Saldo Tercatat" / "Recorded Balance", "Tipe Dompet" / "Wallet Type".
-- [x] **BudgetsView.tsx**:
-  - Label statistik: "Terpakai Bulan Ini" / "Spent This Month", "Pagu Bulanan" / "Monthly Limit".
-  - Tooltip "Ubah Batas Pagu" / "Edit Budget Limit".
-  - Progres: "% terpakai" / "% used", "Sisa: ..." / "Remaining: ...".
-- [x] **TransactionsView.tsx**:
-  - Header: "Riwayat & Mutasi Transaksi" / "Transaction History & Mutations", "transaksi ditemukan" / "transactions found".
-  - Modal konfirmasi hapus: label Keterangan, Nominal, Tanggal, Dompet Terkait, Kategori.
-- [x] **ToolsView.tsx**:
-  - Form target tabungan: judul, placeholder nama target, nominal target, tombol batal & simpan target.
-  - Form setor tabungan: judul setor, pilihan dompet asal, placeholder setoran, tombol setor.
-  - Rasio 50/30/20: Kebutuhan (Needs 50%), Keinginan (Wants 30%), Tabungan (Savings 20%).
-  - Kalkulator Split Bill: "Bagi Tagihan & Catat Cepat" / "Split Bill & Quick Record", status "Tercatat!" / "Recorded!".
-- [x] **ExchangeRatesView.tsx**:
-  - Judul tabel: "Tabel Nilai Tukar Terhadap Rupiah (IDR)" / "Exchange Rate Table Relative to Rupiah (IDR)", "Kurs Pasar Terkini" / "Live Market FX".
-  - Aria-label tombol tukar mata uang ("Swap Currencies").
-- [x] **AdminView.tsx**:
-  - Kartu metrik: "Dompet Tersimpan" / "Saved Wallets", "Catatan Transaksi" / "Transactions Recorded", "Pagu Anggaran Aktif" / "Active Budgets", "Target Tabungan" / "Financial Goals".
-  - Pengumuman & timer sistem: placeholder, "Pasang Pengumuman", "Hapus Banner", "Simpan Timer", "Pengaturan disimpan!".
-  - Modal manajemen user: "Tangguhkan" / "Suspend", "Aktifkan" / "Activate", "Hapus Akun" / "Delete Account".
-- [x] **SettingsView.tsx**:
-  - Status koneksi database: "Database Aktif" / "Database Active".
-  - Pesan sukses pengosongan database: "Seluruh data di database cloud Anda telah berhasil dikosongkan." / "All data in your cloud database has been successfully cleared."
-  - Detail dialog konfirmasi reset: "Dompet Tersimpan", "Riwayat Transaksi", "Target Tabungan".
-- [x] **TransactionModal.tsx**:
-  - Pesan validasi: nominal valid, keterangan transaksi wajib diisi, dompet asal dan tujuan tidak boleh sama.
-  - Pesan error OCR scan struk.
-  - Chip auto-kategori: "Auto-kategori aktif" / "Auto-category active".
-  - Placeholder keterangan & catatan.
-  - Dialog konfirmasi pencatatan transaksi: judul, pesan, label rincian.
-- [x] **AddWalletModal.tsx**:
-  - Placeholder nama akun dan nomor rekening, label "Warna Ikon" / "Icon Color".
-- [x] **WalletDetailModal.tsx**:
-  - Fallback nama dompet asal/tujuan pada mutasi transfer.
-- [x] **ConfirmationModal.tsx**:
-  - Default bilingual untuk tombol konfirmasi dan batal serta aria-label tombol tutup.
-- [x] **PinLockModal.tsx**:
-  - Pesan PIN salah: "PIN salah. Coba lagi." / "Incorrect PIN. Try again.", aria-label hapus digit.
+### Pengeluaran (17 Kategori):
+1. **Makanan & Minuman** (Food & Dining) - `needs`
+2. **Belanja Bahan Makanan & Supermarket** (Groceries & Supermarket) - `needs`
+3. **Transportasi & Bensin** (Transportation & Fuel) - `needs`
+4. **Tagihan & Utilitas** (Bills & Utilities) - `needs`
+5. **Tempat Tinggal & Sewa** (Housing & Rent) - `needs`
+6. **Kesehatan & Medis** (Healthcare & Medical) - `needs`
+7. **Pendidikan & Kursus** (Education & Courses) - `needs`
+8. **Keluarga & Anak** (Family & Childcare) - `needs`
+9. **Hewan Peliharaan** (Pets & Vet) - `wants`
+10. **Belanja & Lifestyle** (Shopping & Lifestyle) - `wants`
+11. **Hiburan & Rekreasi** (Entertainment & Leisure) - `wants`
+12. **Perjalanan & Liburan** (Travel & Vacation) - `wants`
+13. **Donasi, Zakat & Sedekah** (Charity & Donations) - `wants`
+14. **Perawatan Diri & Salon** (Personal Care & Beauty) - `wants`
+15. **Langganan Digital** (Digital Subscriptions) - `wants`
+16. **Pajak, Biaya Bank & Admin** (Taxes, Fees & Admin) - `needs`
+17. **Lainnya (Pengeluaran)** (Other Expenses) - `wants`
 
-## 3. Verifikasi
-- [x] Test suite: 15/15 unit test berhasil lulus (`npm test`).
-- [x] TypeScript build: `compile_applet` sukses tanpa error.
-- [x] Type checking: `lint_applet` (`tsc --noEmit`) sukses tanpa error.
-- [x] Dev server: port 3000 aktif merespons HTTP 200 OK.
+### Pemasukan (7 Kategori):
+18. **Gaji Pokok & Upah** (Salary & Wages) - `savings`
+19. **Bonus & Tunjangan** (Bonus & Incentives) - `savings`
+20. **Investasi & Dividen** (Investments & Dividends) - `savings`
+21. **Bisnis & Freelance** (Business & Freelance) - `savings`
+22. **Pendapatan Pasif & Sewa** (Passive Income & Rental) - `savings`
+23. **Hadiah & Hibah** (Gifts & Grants) - `savings`
+24. **Pemasukan Lainnya** (Other Income) - `savings`
+
+- **Smart Prediction**: Kamus pencocokan kata kunci (`categoryMatcher.ts`) diperluas untuk mengenali nama toko, supermarket (Indomaret, Alfamart, Hypermart), sewa kos, pakan hewan, tiket pesawat, dividen, freelance, dan zakat secara otomatis.
+- **Backward Compatibility**: Pengguna lama yang sudah memiliki data kategori di perangkatnya akan otomatis mendapatkan 24 kategori baru tanpa menghapus pagu/limit anggaran yang sudah diatur sebelumnya.
+
+---
+
+## 2. Menu Pagu Anggaran & Kurs Live di Mobile
+Sebelumnya, menu Anggaran (`budgets`) dan Kurs Live (`rates`) hanya ada di Sidebar desktop atau tersembunyi. Kini keduanya dapat diakses dengan **1-tap langsung di smartphone/mobile**:
+
+1. **Bottom Navigation Bar (Bawah Layar Ponsel)**:
+   - **Tab 1**: Ringkasan (Dashboard)
+   - **Tab 2**: Dompet (Wallets)
+   - **Tab 3 (Tengah)**: Tombol Tambah Transaksi Cepat (`+`)
+   - **Tab 4**: **Pagu Anggaran** (Budgets) dengan ikon *PieChart* - langsung membuka halaman batas anggaran & evaluasi 50/30/20.
+   - **Tab 5**: **Lainnya (Menu & Fitur Lengkap)** dengan ikon *Grid* - membuka lembar geser (drawer) elegan yang memuat:
+     - **Kurs Live & Konverter Valas** (dilengkapi lencana ticker real-time, misal `1 USD = Rp 16.250`).
+     - **Riwayat Mutasi Lengkap**.
+     - **Alat Finansial** (Target Tabungan, Rasio 50/30/20, Kalkulator Split Bill).
+     - **Pengaturan & Notifikasi**.
+     - **Konsol Creator/Admin** (khusus admin).
+
+2. **Top Bar Header (Atas Layar Ponsel)**:
+   - Menambahkan tombol pil ticker **Kurs Live** (`📈 $16.250`) di header ponsel. Mengklik tombol ini langsung membuka tampilan Kurs Valuta Asing Real-Time dan Kalkulator Valas.
+   - Di dalam drawer preferensi ponsel, ditambahkan tombol pintas kartu untuk **Pagu Anggaran** dan **Kurs Valas**.
+
+---
+
+## 3. Hasil Pengujian & Verifikasi
+- **15/15 Unit Tests Passed** (`categoryMatcher.test.ts` dan `financeCalculators.test.ts`).
+- **Linter & TypeScript Clean**: 0 error (`tsc --noEmit` lolos).
+- **Compilation Check**: `compile_applet` sukses.
+- **Dev Server**: Responsif pada port 3000 (`HTTP 200 OK`).

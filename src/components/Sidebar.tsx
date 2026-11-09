@@ -33,7 +33,7 @@ export const Sidebar: React.FC = () => {
     { id: 'dashboard', label: t.navDashboard, icon: LayoutDashboard },
     { id: 'wallets', label: t.navWallets, icon: Wallet },
     { id: 'rates', label: t.navRates, icon: TrendingUp },
-    { id: 'budgets', label: t.budgetStatus, icon: PieChart },
+    { id: 'budgets', label: t.navBudgets, icon: PieChart },
     { id: 'transactions', label: t.navTransactions, icon: History },
     { id: 'tools', label: t.navTools, icon: Grid },
     { id: 'settings', label: t.navSettings, icon: Settings },
