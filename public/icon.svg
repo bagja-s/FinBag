@@ -1,36 +1,74 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
   <defs>
-    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#0A192F"/>
-      <stop offset="100%" stop-color="#030712"/>
+    <!-- Subtle drop shadow for floating minimalist depth -->
+    <filter id="cardShadow" x="-10%" y="-10%" width="120%" height="125%" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="16" stdDeviation="24" flood-color="#0F172A" flood-opacity="0.10" />
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#1E3A8A" flood-opacity="0.06" />
+    </filter>
+
+    <!-- Premium Indigo-Blue Gradient for Wallet Body -->
+    <linearGradient id="finBagBody" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2563EB" />
+      <stop offset="60%" stop-color="#1D4ED8" />
+      <stop offset="100%" stop-color="#1E40AF" />
     </linearGradient>
-    <linearGradient id="primaryGlow" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#3B82F6"/>
-      <stop offset="100%" stop-color="#1D4ED8"/>
+
+    <!-- Accent Emerald Growth Gradient -->
+    <linearGradient id="emeraldGrowth" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#34D399" />
+      <stop offset="100%" stop-color="#059669" />
     </linearGradient>
-    <linearGradient id="accentGlow" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#10B981"/>
-      <stop offset="100%" stop-color="#059669"/>
+
+    <!-- Top Handle Accent -->
+    <linearGradient id="handleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#60A5FA" />
+      <stop offset="100%" stop-color="#3B82F6" />
     </linearGradient>
   </defs>
-  
-  <!-- Rounded Base Background -->
-  <rect width="512" height="512" rx="128" fill="url(#bg)"/>
-  <rect x="16" y="16" width="480" height="480" rx="112" fill="none" stroke="#1E3A8A" stroke-width="4" stroke-opacity="0.5"/>
-  
-  <!-- Main Bag / Wallet Body -->
-  <path d="M128 180 C128 155 148 136 172 136 L340 136 C364 136 384 155 384 180 L384 372 C384 396 364 416 340 416 L172 416 C148 416 128 396 128 372 Z" fill="url(#primaryGlow)"/>
-  
-  <!-- Handle -->
-  <path d="M192 136 V112 C192 88 212 68 236 68 H276 C300 68 320 88 320 112 V136" fill="none" stroke="#60A5FA" stroke-width="24" stroke-linecap="round"/>
-  
-  <!-- Bag Fold & Flap -->
-  <path d="M128 200 L256 280 L384 200" fill="none" stroke="#93C5FD" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
-  
-  <!-- Security / Lock Badge -->
-  <circle cx="256" cy="300" r="38" fill="#0A192F" stroke="#F59E0B" stroke-width="8"/>
-  <path d="M246 300 L253 310 L268 290" fill="none" stroke="#10B981" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
 
-  <!-- Currency Pulse Arc -->
-  <path d="M100 256 A 156 156 0 0 1 412 256" fill="none" stroke="url(#accentGlow)" stroke-width="12" stroke-linecap="round" stroke-dasharray="8 16"/>
+  <!-- Clean Pure White Background with Subtle Outer Border -->
+  <rect width="512" height="512" rx="120" fill="#FFFFFF" />
+  <rect x="2" y="2" width="508" height="508" rx="118" fill="none" stroke="#E2E8F0" stroke-width="4" />
+
+  <!-- Group with Shadow -->
+  <g filter="url(#cardShadow)">
+    <!-- Bag Handle -->
+    <path d="M196 150 V124 C196 95 219 72 248 72 H264 C293 72 316 95 316 124 V150" 
+          fill="none" 
+          stroke="url(#handleGrad)" 
+          stroke-width="26" 
+          stroke-linecap="round" />
+
+    <!-- Main Wallet / Bag Container -->
+    <rect x="116" y="148" width="280" height="256" rx="44" fill="url(#finBagBody)" />
+
+    <!-- Geometric Accent / Front Pocket Curve -->
+    <path d="M116 230 C170 270 342 270 396 230 V360 C396 384 376 404 352 404 H160 C136 404 116 384 116 360 Z" 
+          fill="#1E3A8A" 
+          fill-opacity="0.55" />
+
+    <!-- Modern Clean Minimalist Flap Fold -->
+    <path d="M120 156 L256 250 L392 156" 
+          fill="none" 
+          stroke="#93C5FD" 
+          stroke-width="12" 
+          stroke-linecap="round" 
+          stroke-linejoin="round" 
+          stroke-opacity="0.9" />
+
+    <!-- Growth / Security Emerald Clasp Badge -->
+    <circle cx="256" cy="272" r="32" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="4" />
+    <circle cx="256" cy="272" r="22" fill="url(#emeraldGrowth)" />
+
+    <!-- Minimalist Security / Currency Spark Icon -->
+    <path d="M256 261 V283 M245 272 H267" 
+          fill="none" 
+          stroke="#FFFFFF" 
+          stroke-width="5" 
+          stroke-linecap="round" />
+  </g>
+
+  <!-- Minimalist Corner Accent Dots -->
+  <circle cx="152" cy="184" r="5" fill="#60A5FA" fill-opacity="0.7" />
+  <circle cx="360" cy="184" r="5" fill="#60A5FA" fill-opacity="0.7" />
 </svg>

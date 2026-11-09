@@ -134,11 +134,13 @@ export const ToolsView: React.FC = () => {
         {/* Add Goal Form */}
         {showAddGoal && (
           <form onSubmit={handleCreateGoal} className="mt-4 p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-3">
-            <h3 className="text-xs font-bold text-slate-900 dark:text-white">Buat Target Tabungan Baru</h3>
+            <h3 className="text-xs font-bold text-slate-900 dark:text-white">
+              {language === 'id' ? 'Buat Target Tabungan Baru' : 'Create New Financial Goal'}
+            </h3>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <input
                 type="text"
-                placeholder="Judul Target (cth: Liburan Bali)"
+                placeholder={language === 'id' ? 'Judul Target (cth: Liburan Bali)' : 'Goal Title (e.g. Bali Vacation)'}
                 value={goalTitle}
                 onChange={(e) => setGoalTitle(e.target.value)}
                 required
@@ -146,7 +148,7 @@ export const ToolsView: React.FC = () => {
               />
               <input
                 type="number"
-                placeholder="Nominal Target"
+                placeholder={language === 'id' ? 'Nominal Target' : 'Target Amount'}
                 value={goalTargetStr}
                 onChange={(e) => setGoalTargetStr(e.target.value)}
                 required
@@ -163,15 +165,15 @@ export const ToolsView: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setShowAddGoal(false)}
-                className="px-3 py-1.5 text-xs text-slate-500 hover:text-slate-700"
+                className="px-3 py-1.5 text-xs text-slate-500 hover:text-slate-700 cursor-pointer"
               >
-                Batal
+                {t.cancel}
               </button>
               <button
                 type="submit"
-                className="rounded-lg bg-blue-600 px-4 py-1.5 text-xs font-bold text-white hover:bg-blue-500"
+                className="rounded-lg bg-blue-600 px-4 py-1.5 text-xs font-bold text-white hover:bg-blue-500 cursor-pointer"
               >
-                Simpan Target
+                {language === 'id' ? 'Simpan Target' : 'Save Goal'}
               </button>
             </div>
           </form>
@@ -242,23 +244,23 @@ export const ToolsView: React.FC = () => {
         {contributeGoalId && (
           <form onSubmit={handleContribute} className="mt-4 p-4 rounded-xl bg-blue-50/60 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/40 space-y-3">
             <h4 className="text-xs font-bold text-blue-900 dark:text-blue-300">
-              Setor Tabungan ke: {goals.find(g => g.id === contributeGoalId)?.title}
+              {language === 'id' ? 'Setor Tabungan ke' : 'Deposit Savings to'}: {goals.find(g => g.id === contributeGoalId)?.title}
             </h4>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <select
                 value={contributeWalletId}
                 onChange={(e) => setContributeWalletId(e.target.value)}
-                className="h-10 rounded-xl border border-blue-300 bg-white px-3 text-xs dark:bg-slate-800 dark:border-slate-700 dark:text-white focus:outline-none"
+                className="h-10 rounded-xl border border-blue-300 bg-white px-3 text-xs dark:bg-slate-800 dark:border-slate-700 dark:text-white focus:outline-none cursor-pointer"
               >
                 {wallets.map((w) => (
                   <option key={w.id} value={w.id}>
-                    Ambil dari: {w.name} ({formatCurrency(w.balance, w.currency)})
+                    {language === 'id' ? 'Ambil dari' : 'Source'}: {w.name} ({formatCurrency(w.balance, w.currency)})
                   </option>
                 ))}
               </select>
               <input
                 type="number"
-                placeholder="Nominal Setoran"
+                placeholder={language === 'id' ? 'Nominal Setoran' : 'Deposit Amount'}
                 value={contributeAmountStr}
                 onChange={(e) => setContributeAmountStr(e.target.value)}
                 required
@@ -269,15 +271,15 @@ export const ToolsView: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setContributeGoalId(null)}
-                className="px-3 py-1.5 text-xs text-slate-500"
+                className="px-3 py-1.5 text-xs text-slate-500 hover:text-slate-700 cursor-pointer"
               >
-                Batal
+                {t.cancel}
               </button>
               <button
                 type="submit"
-                className="rounded-lg bg-blue-600 px-4 py-1.5 text-xs font-bold text-white hover:bg-blue-500"
+                className="rounded-lg bg-blue-600 px-4 py-1.5 text-xs font-bold text-white hover:bg-blue-500 cursor-pointer"
               >
-                Setor Sekarang
+                {language === 'id' ? 'Setor Sekarang' : 'Deposit Now'}
               </button>
             </div>
           </form>
@@ -300,9 +302,9 @@ export const ToolsView: React.FC = () => {
           {/* Needs */}
           <div className="rounded-xl border border-slate-200 p-4 dark:border-slate-800">
             <div className="flex items-center justify-between text-xs font-bold text-slate-900 dark:text-white">
-              <span>Kebutuhan (Needs)</span>
+              <span>{language === 'id' ? 'Kebutuhan (Needs)' : 'Needs (50%)'}</span>
               <span className={`font-mono tabular-nums ${rule503020.needsPercentage > 50 ? 'text-rose-500' : 'text-emerald-500'}`}>
-                {rule503020.needsPercentage}% (Target 50%)
+                {rule503020.needsPercentage}% ({language === 'id' ? 'Target' : 'Target'} 50%)
               </span>
             </div>
             <p className="text-sm font-bold font-mono text-slate-900 dark:text-white mt-1 tabular-nums">
@@ -314,9 +316,9 @@ export const ToolsView: React.FC = () => {
           {/* Wants */}
           <div className="rounded-xl border border-slate-200 p-4 dark:border-slate-800">
             <div className="flex items-center justify-between text-xs font-bold text-slate-900 dark:text-white">
-              <span>Keinginan (Wants)</span>
+              <span>{language === 'id' ? 'Keinginan (Wants)' : 'Wants (30%)'}</span>
               <span className={`font-mono tabular-nums ${rule503020.wantsPercentage > 30 ? 'text-amber-500' : 'text-emerald-500'}`}>
-                {rule503020.wantsPercentage}% (Target 30%)
+                {rule503020.wantsPercentage}% ({language === 'id' ? 'Target' : 'Target'} 30%)
               </span>
             </div>
             <p className="text-sm font-bold font-mono text-slate-900 dark:text-white mt-1 tabular-nums">
@@ -328,9 +330,9 @@ export const ToolsView: React.FC = () => {
           {/* Savings */}
           <div className="rounded-xl border border-slate-200 p-4 dark:border-slate-800">
             <div className="flex items-center justify-between text-xs font-bold text-slate-900 dark:text-white">
-              <span>Tabungan (Savings)</span>
+              <span>{language === 'id' ? 'Tabungan (Savings)' : 'Savings (20%)'}</span>
               <span className={`font-mono tabular-nums ${rule503020.savingsPercentage >= 20 ? 'text-emerald-500' : 'text-rose-500'}`}>
-                {rule503020.savingsPercentage}% (Target 20%)
+                {rule503020.savingsPercentage}% ({language === 'id' ? 'Target' : 'Target'} 20%)
               </span>
             </div>
             <p className="text-sm font-bold font-mono text-slate-900 dark:text-white mt-1 tabular-nums">
@@ -348,7 +350,9 @@ export const ToolsView: React.FC = () => {
             <Users className="h-5 w-5 text-blue-500" />
             <h2 className="text-sm font-bold text-slate-900 dark:text-white">{t.splitBillTitle}</h2>
           </div>
-          <span className="text-[11px] text-slate-400">Bagi Tagihan & Catat Cepat</span>
+          <span className="text-[11px] text-slate-400">
+            {language === 'id' ? 'Bagi Tagihan & Catat Cepat' : 'Split Bill & Quick Record'}
+          </span>
         </div>
 
         <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -413,7 +417,7 @@ export const ToolsView: React.FC = () => {
             {billSuccessMsg && (
               <span className="text-xs font-semibold text-emerald-500 flex items-center gap-1">
                 <CheckCircle2 className="h-4 w-4" />
-                <span>Tercatat!</span>
+                <span>{language === 'id' ? 'Tercatat!' : 'Recorded!'}</span>
               </span>
             )}
           </div>

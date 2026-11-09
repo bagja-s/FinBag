@@ -164,7 +164,7 @@ export const AddWalletModal: React.FC = () => {
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="cth: Bank Mandiri, Dompet Tunai, GoPay"
+              placeholder={language === 'id' ? 'cth: Bank Mandiri, Dompet Tunai, GoPay' : 'e.g. Chase Bank, Cash Wallet, PayPal'}
               required
               className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-medium text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow"
             />
@@ -231,14 +231,14 @@ export const AddWalletModal: React.FC = () => {
               type="text"
               value={accountNumber}
               onChange={(e) => setAccountNumber(e.target.value)}
-              placeholder="cth: •••• 8812 atau 0812345678"
+              placeholder={language === 'id' ? 'cth: •••• 8812 atau 0812345678' : 'e.g. •••• 8812 or 0812345678'}
               className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-medium text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white focus:outline-none transition-shadow"
             />
           </div>
 
           <div>
             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-              Warna Ikon
+              {language === 'id' ? 'Warna Ikon' : 'Icon Color'}
             </label>
             <div className="flex gap-2">
               {colorPalette.map((c) => (

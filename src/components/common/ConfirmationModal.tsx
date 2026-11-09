@@ -3,6 +3,8 @@ import { createPortal } from 'react-dom';
 import { AlertTriangle, Trash2, CheckCircle2, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { modalSpringVariants, backdropVariants } from '../../utils/motionVariants';
+import { useFinance } from '../../context/FinanceContext';
+import { getTranslation } from '../../i18n/translations';
 
 export interface ConfirmationModalProps {
   isOpen: boolean;
@@ -21,14 +23,18 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
   isOpen,
   title,
   message,
-  confirmText = 'Konfirmasi',
-  cancelText = 'Batal',
+  confirmText,
+  cancelText,
   variant = 'danger',
   details,
   isLoading = false,
   onConfirm,
   onCancel,
 }) => {
+  const { language } = useFinance();
+  const t = getTranslation(language);
+  const resolvedConfirmText = confirmText || (language === 'id' ? 'Konfirmasi' : 'Confirm');
+  const resolvedCancelText = cancelText || t.cancel;
   // Close on Escape key
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -114,7 +120,7 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
               <button
                 onClick={onCancel}
                 disabled={isLoading}
-                aria-label="Tutup"
+                aria-label={language === 'id' ? 'Tutup' : 'Close'}
                 className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-lg transition-colors cursor-pointer"
               >
                 <X className="h-4 w-4" />
@@ -146,7 +152,7 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
             disabled={isLoading}
             className="flex-1 sm:flex-none rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 active:scale-95 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 transition-all cursor-pointer"
           >
-            {cancelText}
+            {resolvedCancelText}
           </button>
           <button
             type="button"
@@ -157,7 +163,7 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
             {isLoading && (
               <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
             )}
-            <span>{confirmText}</span>
+            <span>{resolvedConfirmText}</span>
           </button>
         </div>
           </motion.div>

@@ -368,7 +368,7 @@ export const DashboardView: React.FC = () => {
                     <div className="flex items-center">
                       <button
                         onClick={() => openEditTransaction(tx)}
-                        title="Edit Transaksi"
+                        title={language === 'id' ? 'Edit Transaksi' : 'Edit Transaction'}
                         aria-label={`Edit ${tx.description}`}
                         className="p-1 sm:p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 rounded-lg transition-all duration-150 active:scale-90 cursor-pointer"
                       >
@@ -376,7 +376,7 @@ export const DashboardView: React.FC = () => {
                       </button>
                       <button
                         onClick={() => setTxToDelete(tx)}
-                        title="Hapus Transaksi"
+                        title={language === 'id' ? 'Hapus Transaksi' : 'Delete Transaction'}
                         aria-label={`Hapus ${tx.description}`}
                         className="p-1 sm:p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-all duration-150 active:scale-90 cursor-pointer"
                       >
@@ -396,7 +396,7 @@ export const DashboardView: React.FC = () => {
         isOpen={Boolean(txToDelete)}
         title={t.confirmDeleteTransactionTitle}
         message={t.confirmDeleteTransactionDesc}
-        confirmText="Hapus Transaksi"
+        confirmText={language === 'id' ? 'Hapus Transaksi' : 'Delete Transaction'}
         cancelText={t.cancel}
         variant="danger"
         isLoading={isDeleting}
@@ -412,9 +412,9 @@ export const DashboardView: React.FC = () => {
         }}
         onCancel={() => setTxToDelete(null)}
         details={txToDelete ? [
-          { label: 'Keterangan', value: txToDelete.description },
-          { label: 'Nominal', value: formatCurrency(txToDelete.amount, txToDelete.currency) },
-          { label: 'Tanggal', value: txToDelete.date },
+          { label: language === 'id' ? 'Keterangan' : 'Description', value: txToDelete.description },
+          { label: language === 'id' ? 'Nominal' : 'Amount', value: formatCurrency(txToDelete.amount, txToDelete.currency) },
+          { label: language === 'id' ? 'Tanggal' : 'Date', value: txToDelete.date },
         ] : []}
       />
     </div>

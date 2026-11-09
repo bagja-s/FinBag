@@ -33,7 +33,7 @@ export const LoginView: React.FC = () => {
       await loginWithGoogle();
     } catch (err: unknown) {
       console.error('Google Sign-In failed:', err);
-      const message = err instanceof Error ? err.message : 'Gagal masuk dengan akun Google.';
+      const message = err instanceof Error ? err.message : (language === 'id' ? 'Gagal masuk dengan akun Google.' : 'Failed to sign in with Google.');
       setErrorMsg(message);
     } finally {
       setIsLoading(false);
@@ -49,9 +49,11 @@ export const LoginView: React.FC = () => {
       {/* Top Header Controls */}
       <header className="relative z-10 mx-auto flex w-full max-w-5xl items-center justify-between px-5 py-4">
         <div className="flex items-center gap-2.5">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-white font-extrabold text-xl shadow-lg shadow-blue-600/30">
-            F
-          </div>
+          <img 
+            src="/icon.svg" 
+            alt="FinBag" 
+            className="h-10 w-10 rounded-xl bg-white p-1 border border-slate-700 shadow-lg object-contain" 
+          />
           <div>
             <span className="text-xl font-bold tracking-tight text-white leading-none">FinBag</span>
             <span className="block text-[10px] text-blue-400 font-medium tracking-wide uppercase mt-0.5">
@@ -64,7 +66,7 @@ export const LoginView: React.FC = () => {
           {/* Language Toggle */}
           <button
             onClick={() => setLanguage(language === 'id' ? 'en' : 'id')}
-            title="Ganti Bahasa / Switch Language"
+            title={language === 'id' ? 'Ganti Bahasa / Switch Language' : 'Switch Language / Ganti Bahasa'}
             className="flex h-9 items-center gap-1.5 rounded-xl border border-slate-800 bg-slate-900/80 px-3 text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition-all"
           >
             <Globe className="h-3.5 w-3.5 text-blue-400" />
@@ -74,7 +76,7 @@ export const LoginView: React.FC = () => {
           {/* Theme Toggle */}
           <button
             onClick={toggleTheme}
-            aria-label="Ganti Tema"
+            aria-label={language === 'id' ? 'Ganti Tema' : 'Toggle Theme'}
             className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-800 bg-slate-900/80 text-slate-300 hover:bg-slate-800 hover:text-white transition-all"
           >
             {theme === 'dark' ? <Sun className="h-4 w-4 text-amber-400" /> : <Moon className="h-4 w-4 text-slate-300" />}
@@ -88,7 +90,7 @@ export const LoginView: React.FC = () => {
           {/* Badge */}
           <div className="inline-flex items-center gap-1.5 rounded-full border border-blue-500/30 bg-blue-500/10 px-3 py-1 text-[11px] font-semibold text-blue-400">
             <Cloud className="h-3.5 w-3.5" />
-            <span>Cloud Firestore Sync Real-Time</span>
+            <span>{language === 'id' ? 'Cloud Firestore Sync Real-Time' : 'Real-Time Cloud Firestore Sync'}</span>
           </div>
 
           <h1 className="mt-4 text-2xl sm:text-3xl font-extrabold tracking-tight text-white">

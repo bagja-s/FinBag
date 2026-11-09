@@ -70,10 +70,10 @@ export const TransactionsView: React.FC = () => {
         <div>
           <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
             <History className="h-5 w-5 text-blue-500" />
-            <span>Riwayat & Mutasi Transaksi</span>
+            <span>{language === 'id' ? 'Riwayat & Mutasi Transaksi' : 'Transaction History & Mutations'}</span>
           </h1>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            {filtered.length} transaksi ditemukan · {language === 'id' ? 'Lengkap dengan pencarian, filter, edit & konfirmasi' : 'Complete with search, filters, edit & confirmations'}
+            {filtered.length} {language === 'id' ? 'transaksi ditemukan' : 'transactions found'} · {language === 'id' ? 'Lengkap dengan pencarian, filter, edit & konfirmasi' : 'Complete with search, filters, edit & confirmations'}
           </p>
         </div>
 
@@ -247,7 +247,7 @@ export const TransactionsView: React.FC = () => {
                     <div className="flex items-center gap-1">
                       <button
                         onClick={() => openEditTransaction(tx)}
-                        title="Edit Transaksi"
+                        title={language === 'id' ? 'Edit Transaksi' : 'Edit Transaction'}
                         aria-label={`Edit ${tx.description}`}
                         className="flex items-center gap-1 p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 dark:text-slate-400 dark:hover:text-blue-400 dark:hover:bg-blue-950/40 rounded-lg transition-all duration-150 active:scale-90 cursor-pointer"
                       >
@@ -257,7 +257,7 @@ export const TransactionsView: React.FC = () => {
 
                       <button
                         onClick={() => setTxToDelete(tx)}
-                        title="Hapus Transaksi"
+                        title={language === 'id' ? 'Hapus Transaksi' : 'Delete Transaction'}
                         aria-label={`Hapus ${tx.description}`}
                         className="flex items-center gap-1 p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:text-slate-400 dark:hover:text-rose-400 dark:hover:bg-rose-950/40 rounded-lg transition-all duration-150 active:scale-90 cursor-pointer"
                       >
@@ -278,18 +278,18 @@ export const TransactionsView: React.FC = () => {
         isOpen={Boolean(txToDelete)}
         title={t.confirmDeleteTransactionTitle}
         message={t.confirmDeleteTransactionDesc}
-        confirmText="Hapus Transaksi"
+        confirmText={language === 'id' ? 'Hapus Transaksi' : 'Delete Transaction'}
         cancelText={t.cancel}
         variant="danger"
         isLoading={isDeleting}
         onConfirm={handleConfirmDelete}
         onCancel={() => setTxToDelete(null)}
         details={txToDelete ? [
-          { label: 'Keterangan', value: txToDelete.description },
-          { label: 'Nominal', value: formatCurrency(txToDelete.amount, txToDelete.currency) },
-          { label: 'Tanggal', value: txToDelete.date },
-          { label: 'Dompet Terkait', value: walletOfTxToDelete?.name || txToDelete.sourceWalletId },
-          ...(categoryOfTxToDelete ? [{ label: 'Kategori', value: language === 'en' ? categoryOfTxToDelete.nameEn : categoryOfTxToDelete.name }] : [])
+          { label: language === 'id' ? 'Keterangan' : 'Description', value: txToDelete.description },
+          { label: language === 'id' ? 'Nominal' : 'Amount', value: formatCurrency(txToDelete.amount, txToDelete.currency) },
+          { label: language === 'id' ? 'Tanggal' : 'Date', value: txToDelete.date },
+          { label: language === 'id' ? 'Dompet Terkait' : 'Related Wallet', value: walletOfTxToDelete?.name || txToDelete.sourceWalletId },
+          ...(categoryOfTxToDelete ? [{ label: language === 'id' ? 'Kategori' : 'Category', value: language === 'en' ? categoryOfTxToDelete.nameEn : categoryOfTxToDelete.name }] : [])
         ] : []}
       />
     </div>

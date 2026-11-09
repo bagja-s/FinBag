@@ -225,9 +225,9 @@ export const WalletsView: React.FC = () => {
         onConfirm={handleConfirmDelete}
         onCancel={() => setWalletToDelete(null)}
         details={walletToDelete ? [
-          { label: 'Nama Akun', value: walletToDelete.name },
-          { label: 'Saldo Tercatat', value: formatCurrency(walletToDelete.balance, walletToDelete.currency) },
-          { label: 'Tipe Dompet', value: walletToDelete.type.toUpperCase() },
+          { label: language === 'id' ? 'Nama Akun' : 'Account Name', value: walletToDelete.name },
+          { label: language === 'id' ? 'Saldo Tercatat' : 'Recorded Balance', value: formatCurrency(walletToDelete.balance, walletToDelete.currency) },
+          { label: language === 'id' ? 'Tipe Dompet' : 'Wallet Type', value: walletToDelete.type.toUpperCase() },
         ] : undefined}
       />
     </div>

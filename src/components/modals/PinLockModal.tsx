@@ -24,7 +24,7 @@ export const PinLockModal: React.FC = () => {
       if (next.length === 4) {
         const success = unlockApp(next);
         if (!success) {
-          setErrorMsg('PIN salah. Coba lagi.');
+          setErrorMsg(language === 'id' ? 'PIN salah. Coba lagi.' : 'Incorrect PIN. Try again.');
           setTimeout(() => setEnteredDigits(''), 500);
         }
       }
@@ -98,7 +98,7 @@ export const PinLockModal: React.FC = () => {
           </button>
           <button
             onClick={handleDelete}
-            aria-label="Hapus Digit"
+            aria-label={language === 'id' ? 'Hapus Digit' : 'Delete Digit'}
             className="flex h-14 w-14 mx-auto items-center justify-center rounded-full bg-slate-800/60 text-slate-400 active:bg-slate-700 transition-colors"
           >
             <Delete className="h-5 w-5" />

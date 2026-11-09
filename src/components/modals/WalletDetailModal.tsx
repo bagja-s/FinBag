@@ -432,8 +432,8 @@ export const WalletDetailModal: React.FC = () => {
                                 {isTransfer ? (
                                   <span className="font-semibold text-blue-600 dark:text-blue-400">
                                     {isIncomingTransfer 
-                                      ? `${t.transferIn} ${sourceW?.name || 'Dompet Asal'}` 
-                                      : `${t.transferOut} ${targetW?.name || 'Dompet Tujuan'}`}
+                                      ? `${t.transferIn} ${sourceW?.name || (language === 'id' ? 'Dompet Asal' : 'Source Wallet')}` 
+                                      : `${t.transferOut} ${targetW?.name || (language === 'id' ? 'Dompet Tujuan' : 'Destination Wallet')}`}
                                   </span>
                                 ) : category ? (
                                   <span>{language === 'en' ? category.nameEn : category.name}</span>

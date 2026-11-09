@@ -107,8 +107,8 @@ export const ExchangeRatesView: React.FC = () => {
           <div className="md:col-span-1 flex justify-center pt-4 md:pt-0">
             <button
               onClick={handleSwap}
-              aria-label="Tukar Posisi Mata Uang"
-              className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-600 hover:bg-blue-600 hover:text-white dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-blue-600 transition-colors shadow-sm"
+              aria-label={language === 'id' ? 'Tukar Posisi Mata Uang' : 'Swap Currencies'}
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-600 hover:bg-blue-600 hover:text-white dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-blue-600 transition-colors shadow-sm cursor-pointer"
             >
               <ArrowLeftRight className="h-4 w-4" />
             </button>
@@ -147,9 +147,11 @@ export const ExchangeRatesView: React.FC = () => {
         <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
           <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
             <TrendingUp className="h-4 w-4 text-emerald-500" />
-            <span>Tabel Nilai Tukar Terhadap Rupiah (IDR)</span>
+            <span>{language === 'id' ? 'Tabel Nilai Tukar Terhadap Rupiah (IDR)' : 'Exchange Rate Table Relative to Rupiah (IDR)'}</span>
           </h2>
-          <span className="text-[11px] font-mono text-slate-400">Kurs Pasar Terkini</span>
+          <span className="text-[11px] font-mono text-slate-400">
+            {language === 'id' ? 'Kurs Pasar Terkini' : 'Live Market FX'}
+          </span>
         </div>
 
         <div className="mt-3 divide-y divide-slate-100 dark:divide-slate-800">

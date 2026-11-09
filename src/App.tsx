@@ -49,12 +49,14 @@ const MainLayout: React.FC = () => {
   if (isAuthLoading) {
     return (
       <div className="min-h-screen w-full flex flex-col items-center justify-center bg-slate-950 text-slate-100">
-        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-600 text-white font-extrabold text-2xl shadow-xl shadow-blue-600/30 mb-4 animate-pulse">
-          F
-        </div>
+        <img 
+          src="/icon.svg" 
+          alt="FinBag" 
+          className="h-14 w-14 rounded-2xl bg-white p-1.5 border border-slate-700 shadow-xl shadow-blue-600/20 mb-4 animate-pulse object-contain" 
+        />
         <div className="flex items-center gap-2 text-sm font-semibold text-slate-300">
           <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
-          <span>Memuat sesi FinBag...</span>
+          <span>{language === 'id' ? 'Memuat sesi FinBag...' : 'Loading FinBag session...'}</span>
         </div>
       </div>
     );
@@ -82,7 +84,7 @@ const MainLayout: React.FC = () => {
           onClick={logout}
           className="mt-6 rounded-xl bg-slate-800 hover:bg-slate-700 px-5 py-2.5 text-xs font-bold text-white transition-colors cursor-pointer border border-slate-700 shadow-sm"
         >
-          Keluar dari Akun (Logout)
+          {language === 'id' ? 'Keluar dari Akun' : 'Sign Out'}
         </button>
       </div>
     );
@@ -98,7 +100,11 @@ const MainLayout: React.FC = () => {
       {!isOnline && (
         <div className="fixed bottom-20 left-4 right-4 z-50 mx-auto max-w-sm rounded-xl bg-amber-500/95 backdrop-blur-md px-3.5 py-2.5 text-xs font-semibold text-white shadow-xl flex items-center gap-2">
           <WifiOff className="h-4 w-4 shrink-0" />
-          <span>Mode Offline — Perubahan akan disinkronkan ke Firestore saat online kembali.</span>
+          <span>
+            {language === 'id' 
+              ? 'Mode Offline — Perubahan akan disinkronkan ke Firestore saat online kembali.' 
+              : 'Offline Mode — Changes will sync to Firestore once back online.'}
+          </span>
         </div>
       )}
 

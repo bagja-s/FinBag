@@ -1,71 +1,73 @@
-# Implementasi Pengaturan Kategori & Jenis Notifikasi Push (Notification Preferences)
+# Implementation Plan - Minimalist White-Background Icon & Full English Localization
 
-## Ringkasan Fitur
-Fitur ini memungkinkan pengguna untuk memilih secara terperinci jenis pemberitahuan push apa saja yang ingin diterima atau dinonaktifkan di perangkat mereka, serta menyinkronkan preferensi tersebut secara persisten ke akun database Cloud Firestore.
+## 1. Icon Minimalis Ber-background Putih
+- [x] Mendesain ulang `public/icon.svg`:
+  - Background: Putih bersih (`#FFFFFF`) dengan sudut melengkung halus (`rx="120"`) dan garis tepi lembut (`#E2E8F0`).
+  - Lambang FinBag: Siluet dompet/tas modern geometris berwarna biru royal/indigo elegan (`#2563EB`, `#1E3A8A`), lipatan flap geometris clean, serta aksen permata/koin pertumbuhan hijau emerald (`#10B981`, `#059669`).
+- [x] Mengonversi dan merender aset PNG beresolusi tinggi yang sinkron:
+  - `public/apple-touch-icon.png` (180x180)
+  - `public/pwa-192x192.png` (192x192)
+  - `public/pwa-512x512.png` (512x512)
+- [x] Memperbarui brand wordmark badge di:
+  - Header utama (`TopBar.tsx`): menampilkan `/icon.svg` minimalis putih berbingkai rapi.
+  - Halaman login (`LoginView.tsx`): logo minimalis berlatar putih dengan bayangan elegan.
+  - Loading screen (`App.tsx`): icon `/icon.svg` animasi halus.
+  - PWA manifest (`vite.config.ts`): disesuaikan `background_color: '#FFFFFF'`.
 
-### 1. Kategori Notifikasi yang Didukung (`src/types/finance.ts`)
-- **`budgetAlerts`**: Peringatan Pagu Anggaran (saat pengeluaran mendekati 80% atau melampaui 100% dari batas pagu bulanan kategori).
-- **`goalMilestones`**: Pencapaian Target Tabungan (notifikasi perayaan saat impian tabungan tercapai 100%).
-- **`lowBalanceAlert`**: Peringatan Saldo Rekening Rendah (peringatan dini saat sisa saldo rekening/dompet menipis di bawah ambang batas minimal).
-- **`weeklySummary`**: Ringkasan & Evaluasi Mingguan (laporan berkala pengeluaran mingguan dan pos kategori terbesar).
-- **`transactionReminder`**: Pengingat Catat Transaksi Harian (pengingat otomatis untuk mencatat pengeluaran dan scan struk).
+## 2. Pengecekan & Perbaikan Menyeluruh Bahasa Inggris (100% Bilingual)
+- [x] **App.tsx**:
+  - Loading session: "Memuat sesi FinBag..." / "Loading FinBag session..."
+  - Tombol sign-out suspended: "Keluar dari Akun" / "Sign Out"
+  - Notifikasi offline: "Mode Offline — Perubahan akan disinkronkan ke Firestore saat online kembali." / "Offline Mode — Changes will sync to Firestore once back online."
+- [x] **TopBar.tsx**:
+  - Tombol masuk: "Masuk" / "Sign In"
+  - Tooltip & aria-label (Mata uang utama, ganti bahasa, tema, kunci aplikasi).
+  - Modal panduan instalasi iOS Safari ("Panduan Pasang di iPhone/iPad" / "Install Guide on iPhone/iPad" beserta langkah-langkah dan tombol tutup).
+- [x] **DashboardView.tsx**:
+  - Modal konfirmasi hapus transaksi: "Hapus Transaksi" / "Delete Transaction", label detail ("Description", "Amount", "Date").
+  - Tooltip tombol Edit & Hapus transaksi.
+- [x] **WalletsView.tsx**:
+  - Detail konfirmasi hapus rekening: "Nama Akun" / "Account Name", "Saldo Tercatat" / "Recorded Balance", "Tipe Dompet" / "Wallet Type".
+- [x] **BudgetsView.tsx**:
+  - Label statistik: "Terpakai Bulan Ini" / "Spent This Month", "Pagu Bulanan" / "Monthly Limit".
+  - Tooltip "Ubah Batas Pagu" / "Edit Budget Limit".
+  - Progres: "% terpakai" / "% used", "Sisa: ..." / "Remaining: ...".
+- [x] **TransactionsView.tsx**:
+  - Header: "Riwayat & Mutasi Transaksi" / "Transaction History & Mutations", "transaksi ditemukan" / "transactions found".
+  - Modal konfirmasi hapus: label Keterangan, Nominal, Tanggal, Dompet Terkait, Kategori.
+- [x] **ToolsView.tsx**:
+  - Form target tabungan: judul, placeholder nama target, nominal target, tombol batal & simpan target.
+  - Form setor tabungan: judul setor, pilihan dompet asal, placeholder setoran, tombol setor.
+  - Rasio 50/30/20: Kebutuhan (Needs 50%), Keinginan (Wants 30%), Tabungan (Savings 20%).
+  - Kalkulator Split Bill: "Bagi Tagihan & Catat Cepat" / "Split Bill & Quick Record", status "Tercatat!" / "Recorded!".
+- [x] **ExchangeRatesView.tsx**:
+  - Judul tabel: "Tabel Nilai Tukar Terhadap Rupiah (IDR)" / "Exchange Rate Table Relative to Rupiah (IDR)", "Kurs Pasar Terkini" / "Live Market FX".
+  - Aria-label tombol tukar mata uang ("Swap Currencies").
+- [x] **AdminView.tsx**:
+  - Kartu metrik: "Dompet Tersimpan" / "Saved Wallets", "Catatan Transaksi" / "Transactions Recorded", "Pagu Anggaran Aktif" / "Active Budgets", "Target Tabungan" / "Financial Goals".
+  - Pengumuman & timer sistem: placeholder, "Pasang Pengumuman", "Hapus Banner", "Simpan Timer", "Pengaturan disimpan!".
+  - Modal manajemen user: "Tangguhkan" / "Suspend", "Aktifkan" / "Activate", "Hapus Akun" / "Delete Account".
+- [x] **SettingsView.tsx**:
+  - Status koneksi database: "Database Aktif" / "Database Active".
+  - Pesan sukses pengosongan database: "Seluruh data di database cloud Anda telah berhasil dikosongkan." / "All data in your cloud database has been successfully cleared."
+  - Detail dialog konfirmasi reset: "Dompet Tersimpan", "Riwayat Transaksi", "Target Tabungan".
+- [x] **TransactionModal.tsx**:
+  - Pesan validasi: nominal valid, keterangan transaksi wajib diisi, dompet asal dan tujuan tidak boleh sama.
+  - Pesan error OCR scan struk.
+  - Chip auto-kategori: "Auto-kategori aktif" / "Auto-category active".
+  - Placeholder keterangan & catatan.
+  - Dialog konfirmasi pencatatan transaksi: judul, pesan, label rincian.
+- [x] **AddWalletModal.tsx**:
+  - Placeholder nama akun dan nomor rekening, label "Warna Ikon" / "Icon Color".
+- [x] **WalletDetailModal.tsx**:
+  - Fallback nama dompet asal/tujuan pada mutasi transfer.
+- [x] **ConfirmationModal.tsx**:
+  - Default bilingual untuk tombol konfirmasi dan batal serta aria-label tombol tutup.
+- [x] **PinLockModal.tsx**:
+  - Pesan PIN salah: "PIN salah. Coba lagi." / "Incorrect PIN. Try again.", aria-label hapus digit.
 
-### 2. State & Logika Terpusat (`src/context/FinanceContext.tsx`)
-- **State `notificationPreferences`**: Disimpan di `localStorage` dan tersinkronisasi otomatis dengan dokumen profil pengguna di Firestore (`users/{userId}.notificationPreferences`).
-- **Fungsi `updateNotificationPreferences(newPrefs)`**: Menyimpan perubahan preferensi secara realtime.
-- **Fungsi `triggerCategoryNotificationTest(category)`**: Menguji coba pengiriman notifikasi spesifik untuk masing-masing kategori secara terpisah.
-- **Kondisi Pemicu Otomatis**:
-  - `addTransaction`: Pengecekan pagu anggaran hanya dijalankan jika `budgetAlerts === true`.
-  - `addTransaction`: Pengecekan saldo menipis dijalankan jika `lowBalanceAlert === true`.
-  - `contributeToGoal`: Pengecekan target tabungan tercapai hanya dijalankan jika `goalMilestones === true`.
-
-### 3. Tampilan Antarmuka Pengguna (`src/components/views/SettingsView.tsx`)
-- Terdapat sub-panel khusus "Jenis & Kategori Notifikasi" di dalam Bagian Notifikasi Push.
-- Setiap kategori dilengkapi:
-  - Ikon visual berwarna representatif.
-  - Judul dan deskripsi fungsi yang jelas.
-  - Tombol **Uji** individual untuk langsung mencoba tampilan notifikasi di perangkat.
-  - **Toggle Switch** interaktif dengan animasi transisi yang mulus.
-  - Pesan peringatan jika izin notifikasi sistem browser belum diizinkan.
-
-### 4. Perbaikan Persistensi Saldo Dompet & Kategori Kartu Kredit (Credit Card)
-- **Akar Masalah**: Sebelumnya mutasi transaksi (`addTransaction`, `updateTransaction`, `deleteTransaction`) hanya memperbarui state React lokal dan menyimpan catatan transaksi ke sub-koleksi `users/{userId}/transactions`, tanpa menyinkronkan saldo dompet yang terpengaruh ke sub-koleksi `users/{userId}/wallets`. Akibatnya, saat halaman di-reload, `onSnapshot` Firestore mengambil data dompet dengan saldo sebelum transaksi, menyebabkan saldo dompet dan kekayaan bersih tampak kembali ke semula.
-- **Solusi yang Diterapkan**:
-  1. **Persistensi Realtime**: Pada `addTransaction`, `updateTransaction`, dan `deleteTransaction`, setiap dompet yang terpengaruh (sumber maupun tujuan transfer) langsung diperbarui saldonya ke Firestore (`users/{userId}/wallets/{walletId}`).
-  2. **Auto-Rekonsiliasi Cerdas**: Menambahkan rekonsiliasi otomatis saat aplikasi pertama kali dimuat; jika ada dompet lama dengan transaksi yang belum tersinkron, sistem menghitung delta transaksi secara otomatis, memperbarui saldo dompet, dan menyimpannya secara persisten ke Firestore.
-  3. **Kategori Dompet Baru `credit` (Kartu Kredit)**:
-     - Menambahkan tipe `'credit'` pada `WalletType` (`src/types/finance.ts`).
-     - Memperbarui skema `firebase-blueprint.json` dan aturan keamanan Firestore `firestore.rules` (`isValidWallet`) agar mengizinkan tipe `credit`.
-     - Aturan keamanan berhasil di-deploy ke Cloud Firestore (`deploy_firebase`).
-     - Menyediakan opsi "Kartu Kredit" (Credit Card) di `AddWalletModal.tsx` dengan ikon visual `CreditCard` di `WalletsView.tsx` dan `DashboardView.tsx`.
-     - Menambahkan translasi multi-bahasa (ID: "Kartu Kredit", EN: "Credit Card").
-
-### 5. Fitur Modal Detail & Mutasi Dompet (Wallet Detail & Mutations)
-- **Komponen `WalletDetailModal.tsx`**:
-  - Muncul saat pengguna mengklik kartu dompet di tab **Dompet** maupun ringkasan dompet di tab **Dashboard**.
-  - **Informasi Akun**: Nama dompet, tipe (Bank, Cash, E-Wallet, Kartu Kredit, Investasi), nomor rekening, dan badge mata uang.
-  - **Status & Saldo Realtime**: Saldo dompet dalam mata uang asal dan ekuivalen mata uang utama, dilengkapi status visual (Aktif, Saldo Kosong, atau Saldo Negatif).
-  - **Statistik Khusus Dompet**: Menampilkan akumulasi Total Dana Masuk (pemasukan & transfer masuk), Total Dana Keluar (pengeluaran & transfer keluar), serta jumlah riwayat mutasi.
-  - **Daftar Mutasi Interaktif**:
-    - Filter tab: Semua Mutasi, Masuk, Keluar, dan Transfer.
-    - Kolom pencarian mutasi secara realtime berdasarkan deskripsi atau kategori.
-    - Rincian mutasi dengan tanggal, kategori/arah transfer (`Dari [Dompet]` atau `Ke [Dompet]`), nominal (`+Rp` hijau atau `-Rp` merah), dan tombol edit cepat transaksi.
-  - **Aksi Cepat**: Tombol "Catat Transaksi untuk Dompet Ini" (otomatis memilih dompet ini di modal transaksi), "Ubah Dompet", dan "Tutup".
-
-### 6. Validasi Saldo Kosong atau Kurang (≤ 0) pada Pengeluaran
-- **Logika Pencegahan**:
-  - Jika saldo dompet sumber ≤ 0 atau nominal transaksi melebihi sisa saldo dompet, sistem **memblokir** pembuatan transaksi pengeluaran (`expense`) dan transfer keluar (`transfer`).
-  - **Pada Tampilan Formulir (`TransactionModal.tsx`)**:
-    - Menampilkan informasi sisa saldo langsung di samping label "Dompet Asal".
-    - Pada pilihan dropdown, dompet yang bersaldo kosong/minus diberi tanda keterangan `[Kosong/Minus]`.
-    - Menampilkan banner peringatan berwarna merah jika dompet yang dipilih bersaldo ≤ 0.
-    - Tombol simpan transaksi otomatis di-disable (dinonaktifkan) saat dompet bersaldo kosong dipilih untuk transaksi pengeluaran/transfer.
-    - Menolak submit form dan menampilkan pesan error informatif jika nominal melebihi sisa saldo.
-  - **Pada Level State & Mutasi (`FinanceContext.tsx`)**:
-    - `addTransaction` dan `updateTransaction` memverifikasi saldo dompet sumber sebelum mengeksekusi mutasi. Jika saldo ≤ 0 atau `amount > balance`, mutasi ditolak dengan exception pesan yang jelas.
-
-### 7. Hasil Pengujian & Verifikasi
-- Kompilasi `compile_applet`: **Berhasil (0 error)**.
-- Linting TypeScript `lint_applet`: **0 error**.
-- Unit Test `npm test`: **15/15 Lolos**.
-- Dev Server: **HTTP 200 OK**.
+## 3. Verifikasi
+- [x] Test suite: 15/15 unit test berhasil lulus (`npm test`).
+- [x] TypeScript build: `compile_applet` sukses tanpa error.
+- [x] Type checking: `lint_applet` (`tsc --noEmit`) sukses tanpa error.
+- [x] Dev server: port 3000 aktif merespons HTTP 200 OK.

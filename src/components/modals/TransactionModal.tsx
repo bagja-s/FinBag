@@ -189,13 +189,13 @@ export const TransactionModal: React.FC = () => {
         }
       };
       reader.onerror = () => {
-        setErrorMsg('Gagal membaca file gambar.');
+        setErrorMsg(language === 'id' ? 'Gagal membaca file gambar.' : 'Failed to read image file.');
         setIsScanningReceipt(false);
       };
       reader.readAsDataURL(file);
     } catch (err) {
       console.error(err);
-      setErrorMsg('Gagal memproses struk.');
+      setErrorMsg(language === 'id' ? 'Gagal memproses struk.' : 'Failed to process receipt.');
       setIsScanningReceipt(false);
     }
   };
@@ -226,15 +226,15 @@ export const TransactionModal: React.FC = () => {
     e.preventDefault();
     const parsedAmount = parseFloat(amountStr);
     if (isNaN(parsedAmount) || parsedAmount <= 0) {
-      setErrorMsg('Masukkan nominal yang valid.');
+      setErrorMsg(language === 'id' ? 'Masukkan nominal yang valid.' : 'Please enter a valid amount.');
       return;
     }
     if (!description.trim()) {
-      setErrorMsg('Keterangan transaksi wajib diisi.');
+      setErrorMsg(language === 'id' ? 'Keterangan transaksi wajib diisi.' : 'Transaction description is required.');
       return;
     }
     if (type === 'transfer' && sourceWalletId === targetWalletId) {
-      setErrorMsg('Dompet asal dan tujuan tidak boleh sama.');
+      setErrorMsg(language === 'id' ? 'Dompet asal dan tujuan tidak boleh sama.' : 'Source and destination wallets cannot be the same.');
       return;
     }
 
@@ -307,7 +307,7 @@ export const TransactionModal: React.FC = () => {
       handleClose();
     } catch (err) {
       console.error(err);
-      setErrorMsg('Gagal memproses transaksi. Coba lagi.');
+      setErrorMsg(language === 'id' ? 'Gagal memproses transaksi. Coba lagi.' : 'Failed to process transaction. Please try again.');
       setShowConfirmModal(false);
     } finally {
       setIsSubmitting(false);
@@ -531,7 +531,7 @@ export const TransactionModal: React.FC = () => {
                 {type !== 'transfer' && (
                   <span className="text-[10px] text-blue-600 dark:text-blue-400 font-medium flex items-center gap-1">
                     <Sparkles className="h-3 w-3" />
-                    <span>Auto-kategori aktif</span>
+                    <span>{language === 'id' ? 'Auto-kategori aktif' : 'Auto-category active'}</span>
                   </span>
                 )}
               </div>
@@ -541,7 +541,7 @@ export const TransactionModal: React.FC = () => {
                   type="text"
                   value={description}
                   onChange={handleDescriptionChange}
-                  placeholder="cth: Makan Padang, Bensin Pertamax, Tagihan Listrik, Gaji"
+                  placeholder={language === 'id' ? 'cth: Makan Padang, Bensin Pertamax, Tagihan Listrik, Gaji' : 'e.g. Lunch with friends, Fuel, Electricity Bill, Salary'}
                   required
                   className="w-full bg-transparent text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none"
                 />
@@ -688,7 +688,7 @@ export const TransactionModal: React.FC = () => {
                   type="text"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  placeholder="cth: Bersama teman, nomor struk, dll."
+                  placeholder={language === 'id' ? 'cth: Bersama teman, nomor struk, dll.' : 'e.g. With friends, receipt number, etc.'}
                   className="w-full bg-transparent text-xs font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none"
                 />
               </div>
@@ -726,22 +726,22 @@ export const TransactionModal: React.FC = () => {
       {/* Confirmation Modal before applying changes */}
       <ConfirmationModal
         isOpen={showConfirmModal}
-        title={isEditMode ? t.confirmEditTransactionTitle : (type === 'transfer' ? t.confirmTransferTitle : 'Konfirmasi Catat Transaksi')}
-        message={isEditMode ? t.confirmEditTransactionDesc : (type === 'transfer' ? t.confirmTransferDesc : 'Pastikan rincian transaksi Anda sudah tepat sebelum disimpan ke database.')}
-        confirmText={isEditMode ? 'Simpan Perubahan' : 'Ya, Catat Sekarang'}
+        title={isEditMode ? t.confirmEditTransactionTitle : (type === 'transfer' ? t.confirmTransferTitle : (language === 'id' ? 'Konfirmasi Catat Transaksi' : 'Confirm Record Transaction'))}
+        message={isEditMode ? t.confirmEditTransactionDesc : (type === 'transfer' ? t.confirmTransferDesc : (language === 'id' ? 'Pastikan rincian transaksi Anda sudah tepat sebelum disimpan ke database.' : 'Ensure your transaction details are correct before saving to the database.'))}
+        confirmText={isEditMode ? (language === 'id' ? 'Simpan Perubahan' : 'Save Changes') : (language === 'id' ? 'Ya, Catat Sekarang' : 'Yes, Record Now')}
         cancelText={t.cancel}
         variant={isEditMode ? 'warning' : 'primary'}
         isLoading={isSubmitting}
         onConfirm={handleConfirmedSave}
         onCancel={() => setShowConfirmModal(false)}
         details={[
-          { label: 'Tipe', value: type === 'expense' ? t.typeExpense : type === 'income' ? t.typeIncome : t.typeTransfer },
-          { label: 'Keterangan', value: description },
-          { label: 'Nominal', value: formatCurrency(parseFloat(amountStr) || 0, currency) },
-          { label: 'Dompet Asal', value: sourceWalletObj?.name || '-' },
-          ...(type === 'transfer' ? [{ label: 'Dompet Tujuan', value: targetWalletObj?.name || '-' }] : []),
-          ...(type !== 'transfer' ? [{ label: 'Kategori', value: currentCategoryName }] : []),
-          { label: 'Tanggal', value: date },
+          { label: language === 'id' ? 'Tipe' : 'Type', value: type === 'expense' ? t.typeExpense : type === 'income' ? t.typeIncome : t.typeTransfer },
+          { label: language === 'id' ? 'Keterangan' : 'Description', value: description },
+          { label: language === 'id' ? 'Nominal' : 'Amount', value: formatCurrency(parseFloat(amountStr) || 0, currency) },
+          { label: language === 'id' ? 'Dompet Asal' : 'Source Wallet', value: sourceWalletObj?.name || '-' },
+          ...(type === 'transfer' ? [{ label: language === 'id' ? 'Dompet Tujuan' : 'Destination Wallet', value: targetWalletObj?.name || '-' }] : []),
+          ...(type !== 'transfer' ? [{ label: language === 'id' ? 'Kategori' : 'Category', value: currentCategoryName }] : []),
+          { label: language === 'id' ? 'Tanggal' : 'Date', value: date },
         ]}
       />
     </>

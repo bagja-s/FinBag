@@ -93,14 +93,18 @@ export const BudgetsView: React.FC = () => {
               {/* Spending vs Limit */}
               <div className="mt-4 flex items-end justify-between">
                 <div>
-                  <p className="text-[11px] text-slate-400 font-medium">Terpakai Bulan Ini</p>
+                  <p className="text-[11px] text-slate-400 font-medium">
+                    {language === 'id' ? 'Terpakai Bulan Ini' : 'Spent This Month'}
+                  </p>
                   <p className="text-lg font-bold font-mono text-slate-900 dark:text-white tabular-nums">
                     {formatCurrency(spent, baseCurrency)}
                   </p>
                 </div>
 
                 <div className="text-right">
-                  <p className="text-[11px] text-slate-400 font-medium">Pagu Bulanan</p>
+                  <p className="text-[11px] text-slate-400 font-medium">
+                    {language === 'id' ? 'Pagu Bulanan' : 'Monthly Limit'}
+                  </p>
                   {isEditing ? (
                     <div className="flex items-center gap-1 mt-1">
                       <input
@@ -124,7 +128,7 @@ export const BudgetsView: React.FC = () => {
                       <button
                         onClick={() => handleStartEdit(cat.id, cat.monthlyLimit)}
                         className="text-slate-400 hover:text-blue-500 p-1"
-                        title="Ubah Batas Pagu"
+                        title={language === 'id' ? 'Ubah Batas Pagu' : 'Edit Budget Limit'}
                       >
                         <Edit2 className="h-3.5 w-3.5" />
                       </button>
@@ -148,8 +152,8 @@ export const BudgetsView: React.FC = () => {
                   />
                 </div>
                 <div className="flex justify-between text-[11px] text-slate-500 pt-1">
-                  <span>{health.percentage}% terpakai</span>
-                  <span>Sisa: {formatCurrency(health.remaining, baseCurrency)}</span>
+                  <span>{health.percentage}% {language === 'id' ? 'terpakai' : 'used'}</span>
+                  <span>{language === 'id' ? 'Sisa' : 'Remaining'}: {formatCurrency(health.remaining, baseCurrency)}</span>
                 </div>
               </div>
             </div>

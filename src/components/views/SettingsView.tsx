@@ -549,7 +549,7 @@ export const SettingsView: React.FC = () => {
             </div>
             <span className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400 font-semibold text-[11px]">
               <CheckCircle2 className="h-3.5 w-3.5" />
-              <span>Database Aktif</span>
+              <span>{language === 'id' ? 'Database Aktif' : 'Database Active'}</span>
             </span>
           </div>
 
@@ -615,7 +615,11 @@ export const SettingsView: React.FC = () => {
             {resetSuccessMsg && (
               <p className="mt-3 text-xs font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
                 <CheckCircle2 className="h-4 w-4" />
-                <span>Seluruh data di database cloud Anda telah berhasil dikosongkan.</span>
+                <span>
+                  {language === 'id' 
+                    ? 'Seluruh data di database cloud Anda telah berhasil dikosongkan.' 
+                    : 'All data in your cloud database has been successfully cleared.'}
+                </span>
               </p>
             )}
           </div>
@@ -878,9 +882,9 @@ export const SettingsView: React.FC = () => {
         onCancel={() => setShowResetConfirm(false)}
         details={[
           { label: 'Cloud Database', value: 'Google Cloud Firestore' },
-          { label: 'Dompet Tersimpan', value: `${wallets.length} rekening` },
-          { label: 'Riwayat Transaksi', value: `${transactions.length} transaksi` },
-          { label: 'Target Tabungan', value: `${goals.length} target` },
+          { label: language === 'id' ? 'Dompet Tersimpan' : 'Saved Wallets', value: `${wallets.length} ${language === 'id' ? 'rekening' : 'wallets'}` },
+          { label: language === 'id' ? 'Riwayat Transaksi' : 'Transaction History', value: `${transactions.length} ${language === 'id' ? 'transaksi' : 'transactions'}` },
+          { label: language === 'id' ? 'Target Tabungan' : 'Financial Goals', value: `${goals.length} ${language === 'id' ? 'target' : 'goals'}` },
         ]}
       />
     </div>

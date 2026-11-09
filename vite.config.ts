@@ -18,7 +18,7 @@ export default defineConfig(() => {
           short_name: 'FinBag',
           description: 'Aplikasi PWA Pencatat Keuangan Personal Multi-User, Multi-Dompet, Multi-Mata Uang dengan Kurs Real-Time.',
           theme_color: '#0B132B',
-          background_color: '#0A192F',
+          background_color: '#FFFFFF',
           display: 'standalone',
           start_url: '/',
           scope: '/',
