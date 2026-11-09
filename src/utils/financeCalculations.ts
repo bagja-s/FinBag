@@ -2,7 +2,9 @@ import {
   SupportedCurrency, 
   WalletAccount, 
   Transaction, 
-  BudgetCategory 
+  BudgetCategory,
+  RecurringFrequency,
+  RecurringTransaction
 } from '../types/finance';
 import { CURRENCY_METADATA, FALLBACK_RATES_FROM_USD, convertCurrency } from '../services/currencyService';
 
@@ -707,5 +709,126 @@ export function calculateAutoBudgetSuggestions(
     options
   ).suggestions;
 }
+
+export function calculateNextRecurringDate(
+  currentDateStr: string,
+  frequency: RecurringFrequency
+): string {
+  if (!currentDateStr || !/^\d{4}-\d{2}-\d{2}$/.test(currentDateStr)) {
+    return new Date().toISOString().split('T')[0];
+  }
+
+  const [yr, mo, dy] = currentDateStr.split('-').map(Number);
+
+  if (frequency === 'daily') {
+    const d = new Date(Date.UTC(yr, mo - 1, dy + 1));
+    return d.toISOString().split('T')[0];
+  }
+
+  if (frequency === 'weekly') {
+    const d = new Date(Date.UTC(yr, mo - 1, dy + 7));
+    return d.toISOString().split('T')[0];
+  }
+
+  if (frequency === 'monthly') {
+    const targetMonthIndex = mo; // mo is 1-based, so mo in 0-based Date is next month
+    const targetYear = yr + Math.floor(targetMonthIndex / 12);
+    const normalizedMonth = targetMonthIndex % 12;
+    // Clamp day to max days in target month (e.g. Jan 31 -> Feb 28/29)
+    const maxDaysInTargetMonth = new Date(Date.UTC(targetYear, normalizedMonth + 1, 0)).getUTCDate();
+    const clampedDay = Math.min(dy, maxDaysInTargetMonth);
+    const d = new Date(Date.UTC(targetYear, normalizedMonth, clampedDay));
+    return d.toISOString().split('T')[0];
+  }
+
+  // yearly
+  const targetYear = yr + 1;
+  const maxDaysInTargetMonth = new Date(Date.UTC(targetYear, mo, 0)).getUTCDate();
+  const clampedDay = Math.min(dy, maxDaysInTargetMonth);
+  const d = new Date(Date.UTC(targetYear, mo - 1, clampedDay));
+  return d.toISOString().split('T')[0];
+}
+
+export interface DueRecurringResult {
+  dueDates: string[];
+  updatedNextRunDate: string;
+  shouldDeactivate: boolean;
+}
+
+export function getDueRecurringOccurrences(
+  rule: RecurringTransaction,
+  todayStr: string,
+  maxCatchUpOccurrences: number = 12
+): DueRecurringResult {
+  if (!rule.active || !rule.nextRunDate || !/^\d{4}-\d{2}-\d{2}$/.test(rule.nextRunDate)) {
+    return {
+      dueDates: [],
+      updatedNextRunDate: rule.nextRunDate,
+      shouldDeactivate: false,
+    };
+  }
+
+  const dueDates: string[] = [];
+  let cursorDate = rule.nextRunDate;
+  let shouldDeactivate = false;
+  let safetyCounter = 0;
+
+  while (cursorDate <= todayStr && safetyCounter < maxCatchUpOccurrences) {
+    if (rule.endDate && cursorDate > rule.endDate) {
+      shouldDeactivate = true;
+      break;
+    }
+    dueDates.push(cursorDate);
+    cursorDate = calculateNextRecurringDate(cursorDate, rule.frequency);
+    safetyCounter += 1;
+
+    if (rule.endDate && cursorDate > rule.endDate) {
+      shouldDeactivate = true;
+      break;
+    }
+  }
+
+  return {
+    dueDates,
+    updatedNextRunDate: cursorDate,
+    shouldDeactivate,
+  };
+}
+
+export function calculateMonthlyRecurringSummary(
+  recurringList: RecurringTransaction[],
+  ratesFromUsd: Record<SupportedCurrency, number> = FALLBACK_RATES_FROM_USD,
+  targetCurrency: SupportedCurrency = 'IDR'
+): { activeCount: number; monthlyExpenseEstimate: number; monthlyIncomeEstimate: number } {
+  let activeCount = 0;
+  let monthlyExpenseEstimate = 0;
+  let monthlyIncomeEstimate = 0;
+
+  const freqMultiplier: Record<RecurringFrequency, number> = {
+    daily: 30,
+    weekly: 4.33,
+    monthly: 1,
+    yearly: 1 / 12,
+  };
+
+  recurringList.forEach((rule) => {
+    if (!rule.active) return;
+    activeCount += 1;
+    const inTarget = convertCurrency(rule.amount, rule.currency, targetCurrency, ratesFromUsd);
+    const monthlyEquivalent = inTarget * (freqMultiplier[rule.frequency] || 1);
+    if (rule.type === 'expense') {
+      monthlyExpenseEstimate += monthlyEquivalent;
+    } else if (rule.type === 'income') {
+      monthlyIncomeEstimate += monthlyEquivalent;
+    }
+  });
+
+  return {
+    activeCount,
+    monthlyExpenseEstimate: Math.round(monthlyExpenseEstimate),
+    monthlyIncomeEstimate: Math.round(monthlyIncomeEstimate),
+  };
+}
+
 
 

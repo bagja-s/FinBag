@@ -6,6 +6,28 @@ export type WalletType = 'cash' | 'bank' | 'ewallet' | 'credit' | 'investment';
 
 export type TransactionType = 'expense' | 'income' | 'transfer';
 
+export type RecurringFrequency = 'daily' | 'weekly' | 'monthly' | 'yearly';
+
+export interface RecurringTransaction {
+  id: string;
+  description: string;
+  amount: number;
+  currency: SupportedCurrency;
+  type: TransactionType;
+  categoryId?: string;
+  sourceWalletId: string;
+  targetWalletId?: string;
+  frequency: RecurringFrequency;
+  startDate: string; // YYYY-MM-DD
+  nextRunDate: string; // YYYY-MM-DD
+  endDate?: string; // YYYY-MM-DD
+  lastRunDate?: string; // YYYY-MM-DD
+  active: boolean;
+  notes?: string;
+  userId?: string;
+  createdAt?: string;
+}
+
 export interface WalletAccount {
   id: string;
   name: string;
@@ -43,6 +65,7 @@ export interface Transaction {
   notes?: string;
   userId?: string;
   createdAt?: string;
+  recurringRuleId?: string;
 }
 
 export interface SavingsGoal {

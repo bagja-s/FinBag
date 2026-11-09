@@ -10,8 +10,11 @@ import {
   groupTransactionsByDate,
   calculateAutoBudgetSuggestions,
   calculateAutoBudget503020Summary,
+  calculateNextRecurringDate,
+  getDueRecurringOccurrences,
+  calculateMonthlyRecurringSummary,
 } from './financeCalculations';
-import { WalletAccount, Transaction, BudgetCategory } from '../types/finance';
+import { WalletAccount, Transaction, BudgetCategory, RecurringTransaction } from '../types/finance';
 
 test('formatCurrency correctly formats IDR with Rp prefix and thousands separators', () => {
   const result = formatCurrency(1500000, 'IDR');
@@ -143,5 +146,35 @@ test('calculateAutoBudget503020Summary allocates 50% Needs, 30% Wants, and 20% S
   assert.equal(summary.suggestedNeedsTotal, 5000000);
   assert.equal(summary.suggestedWantsTotal, 3000000);
 });
+
+test('calculateNextRecurringDate advances daily, weekly, monthly (with end-of-month clamping), and yearly dates', () => {
+  assert.equal(calculateNextRecurringDate('2026-11-09', 'daily'), '2026-11-10');
+  assert.equal(calculateNextRecurringDate('2026-11-09', 'weekly'), '2026-11-16');
+  assert.equal(calculateNextRecurringDate('2026-01-31', 'monthly'), '2026-02-28');
+  assert.equal(calculateNextRecurringDate('2026-11-09', 'yearly'), '2027-11-09');
+});
+
+test('getDueRecurringOccurrences collects due dates up to today and respects endDate', () => {
+  const rule: RecurringTransaction = {
+    id: 'rec_1',
+    description: 'Langganan Netflix',
+    amount: 186000,
+    currency: 'IDR',
+    type: 'expense',
+    categoryId: 'subscription',
+    sourceWalletId: 'w1',
+    frequency: 'monthly',
+    startDate: '2026-09-05',
+    nextRunDate: '2026-09-05',
+    endDate: '2026-10-20',
+    active: true,
+  };
+
+  const due = getDueRecurringOccurrences(rule, '2026-11-09');
+  assert.deepEqual(due.dueDates, ['2026-09-05', '2026-10-05']);
+  assert.equal(due.updatedNextRunDate, '2026-11-05');
+  assert.equal(due.shouldDeactivate, true);
+});
+
 
 

@@ -4,10 +4,17 @@ import { getTranslation } from '../../i18n/translations';
 import { 
   formatCurrency, 
   filterTransactionsList, 
-  groupTransactionsByDate 
+  groupTransactionsByDate,
+  calculateMonthlyRecurringSummary
 } from '../../utils/financeCalculations';
 import { ConfirmationModal } from '../common/ConfirmationModal';
-import { Transaction } from '../../types/finance';
+import { 
+  Transaction, 
+  RecurringTransaction, 
+  RecurringFrequency, 
+  TransactionType, 
+  SupportedCurrency 
+} from '../../types/finance';
 import { 
   History, 
   Search, 
@@ -18,18 +25,32 @@ import {
   ArrowUpRight, 
   ArrowLeftRight,
   Plus,
-  Calendar
+  Calendar,
+  Repeat,
+  Play,
+  Pause,
+  CheckCircle2,
+  Clock,
+  ChevronDown,
+  ChevronUp,
+  X
 } from 'lucide-react';
 
 export const TransactionsView: React.FC = () => {
   const { 
     transactions, 
+    recurringTransactions,
     wallets, 
     categories, 
     baseCurrency,
     exchangeRates,
     deleteTransaction, 
     openEditTransaction,
+    addRecurringTransaction,
+    updateRecurringTransaction,
+    deleteRecurringTransaction,
+    toggleRecurringTransaction,
+    executeRecurringTransactionNow,
     exportCSV, 
     exportJSON, 
     setIsTransactionModalOpen,
@@ -43,9 +64,171 @@ export const TransactionsView: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedType, setSelectedType] = useState('all');
 
+  // Recurring Manager UI state
+  const [isRecurringExpanded, setIsRecurringExpanded] = useState<boolean>(true);
+  const [isRecurringFormOpen, setIsRecurringFormOpen] = useState<boolean>(false);
+  const [editingRecurring, setEditingRecurring] = useState<RecurringTransaction | null>(null);
+  const [runningRuleId, setRunningRuleId] = useState<string | null>(null);
+  const [recurringFeedback, setRecurringFeedback] = useState<string | null>(null);
+
+  // Recurring Form fields
+  const [recType, setRecType] = useState<TransactionType>('expense');
+  const [recDesc, setRecDesc] = useState('');
+  const [recAmount, setRecAmount] = useState('');
+  const [recCurrency, setRecCurrency] = useState<SupportedCurrency>(baseCurrency);
+  const [recSourceWalletId, setRecSourceWalletId] = useState(wallets[0]?.id || '');
+  const [recTargetWalletId, setRecTargetWalletId] = useState(wallets[1]?.id || '');
+  const [recCategoryId, setRecCategoryId] = useState(categories[0]?.id || 'subscription');
+  const [recFrequency, setRecFrequency] = useState<RecurringFrequency>('monthly');
+  const [recNextRunDate, setRecNextRunDate] = useState(new Date().toISOString().split('T')[0]);
+  const [recEndDate, setRecEndDate] = useState('');
+  const [recNotes, setRecNotes] = useState('');
+  const [recError, setRecError] = useState('');
+
   // Confirmation state for deleting a transaction
   const [txToDelete, setTxToDelete] = useState<Transaction | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Recurring summary metrics
+  const recurringSummary = useMemo(() => {
+    return calculateMonthlyRecurringSummary(recurringTransactions, exchangeRates.rates, baseCurrency);
+  }, [recurringTransactions, exchangeRates.rates, baseCurrency]);
+
+  const openCreateRecurringForm = () => {
+    setEditingRecurring(null);
+    setRecType('expense');
+    setRecDesc('');
+    setRecAmount('');
+    setRecCurrency(wallets[0]?.currency || baseCurrency);
+    setRecSourceWalletId(wallets[0]?.id || '');
+    setRecTargetWalletId(wallets[1]?.id || wallets[0]?.id || '');
+    setRecCategoryId('subscription');
+    setRecFrequency('monthly');
+    setRecNextRunDate(new Date().toISOString().split('T')[0]);
+    setRecEndDate('');
+    setRecNotes('');
+    setRecError('');
+    setIsRecurringFormOpen(true);
+    setIsRecurringExpanded(true);
+  };
+
+  const openEditRecurringForm = (rule: RecurringTransaction) => {
+    setEditingRecurring(rule);
+    setRecType(rule.type);
+    setRecDesc(rule.description);
+    setRecAmount(rule.amount.toString());
+    setRecCurrency(rule.currency);
+    setRecSourceWalletId(rule.sourceWalletId);
+    setRecTargetWalletId(rule.targetWalletId || wallets[1]?.id || '');
+    setRecCategoryId(rule.categoryId || 'subscription');
+    setRecFrequency(rule.frequency);
+    setRecNextRunDate(rule.nextRunDate);
+    setRecEndDate(rule.endDate || '');
+    setRecNotes(rule.notes || '');
+    setRecError('');
+    setIsRecurringFormOpen(true);
+    setIsRecurringExpanded(true);
+  };
+
+  const handleSaveRecurringForm = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const parsedAmt = parseFloat(recAmount);
+    if (!recDesc.trim()) {
+      setRecError(language === 'id' ? 'Nama jadwal wajib diisi.' : 'Schedule description is required.');
+      return;
+    }
+    if (isNaN(parsedAmt) || parsedAmt <= 0) {
+      setRecError(language === 'id' ? 'Nominal harus lebih dari 0.' : 'Amount must be greater than 0.');
+      return;
+    }
+    if (!recSourceWalletId) {
+      setRecError(language === 'id' ? 'Pilih dompet terlebih dahulu.' : 'Please select a wallet.');
+      return;
+    }
+    if (recType === 'transfer' && recSourceWalletId === recTargetWalletId) {
+      setRecError(language === 'id' ? 'Dompet asal dan tujuan tidak boleh sama.' : 'Source and destination wallets cannot match.');
+      return;
+    }
+
+    setRecError('');
+    if (editingRecurring) {
+      await updateRecurringTransaction(editingRecurring.id, {
+        description: recDesc.trim(),
+        amount: parsedAmt,
+        currency: recCurrency,
+        type: recType,
+        sourceWalletId: recSourceWalletId,
+        targetWalletId: recType === 'transfer' ? recTargetWalletId : undefined,
+        categoryId: recType !== 'transfer' ? recCategoryId : undefined,
+        frequency: recFrequency,
+        nextRunDate: recNextRunDate,
+        endDate: recEndDate || undefined,
+        notes: recNotes.trim() || undefined,
+      });
+      setRecurringFeedback(
+        language === 'id'
+          ? `Jadwal "${recDesc.trim()}" berhasil diperbarui.`
+          : `Schedule "${recDesc.trim()}" updated.`
+      );
+    } else {
+      await addRecurringTransaction({
+        description: recDesc.trim(),
+        amount: parsedAmt,
+        currency: recCurrency,
+        type: recType,
+        sourceWalletId: recSourceWalletId,
+        targetWalletId: recType === 'transfer' ? recTargetWalletId : undefined,
+        categoryId: recType !== 'transfer' ? recCategoryId : undefined,
+        frequency: recFrequency,
+        startDate: recNextRunDate,
+        nextRunDate: recNextRunDate,
+        endDate: recEndDate || undefined,
+        active: true,
+        notes: recNotes.trim() || undefined,
+      });
+      setRecurringFeedback(
+        language === 'id'
+          ? `Jadwal otomatis "${recDesc.trim()}" berhasil ditambahkan.`
+          : `Recurring schedule "${recDesc.trim()}" created.`
+      );
+    }
+
+    setIsRecurringFormOpen(false);
+    setEditingRecurring(null);
+    setTimeout(() => setRecurringFeedback(null), 4000);
+  };
+
+  const handleRunRuleNow = async (rule: RecurringTransaction) => {
+    setRunningRuleId(rule.id);
+    setRecError('');
+    try {
+      await executeRecurringTransactionNow(rule.id);
+      setRecurringFeedback(
+        language === 'id'
+          ? `Transaksi "${rule.description}" berhasil dicatat & jadwal berikutnya diperbarui.`
+          : `Transaction "${rule.description}" recorded and next schedule advanced.`
+      );
+      setTimeout(() => setRecurringFeedback(null), 4000);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : (language === 'id' ? 'Gagal menjalankan jadwal.' : 'Failed to run schedule.');
+      setRecError(msg);
+    } finally {
+      setRunningRuleId(null);
+    }
+  };
+
+  const getFrequencyLabel = (freq: RecurringFrequency) => {
+    if (language === 'id') {
+      if (freq === 'daily') return 'Harian';
+      if (freq === 'weekly') return 'Mingguan';
+      if (freq === 'monthly') return 'Bulanan';
+      return 'Tahunan';
+    }
+    if (freq === 'daily') return 'Daily';
+    if (freq === 'weekly') return 'Weekly';
+    if (freq === 'monthly') return 'Monthly';
+    return 'Yearly';
+  };
 
   // Filter and sort newest first
   const filtered = useMemo(() => {
@@ -119,7 +302,14 @@ export const TransactionsView: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={openCreateRecurringForm}
+            className="flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3.5 py-2 text-xs font-bold text-white shadow-sm hover:bg-indigo-500 transition-colors cursor-pointer whitespace-nowrap"
+          >
+            <Repeat className="h-3.5 w-3.5" />
+            <span>{language === 'id' ? '+ Buat Jadwal Otomatis' : '+ Add Recurring'}</span>
+          </button>
           <button
             onClick={exportCSV}
             className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 transition-colors cursor-pointer whitespace-nowrap"
@@ -135,6 +325,426 @@ export const TransactionsView: React.FC = () => {
             <span>{t.exportJSON}</span>
           </button>
         </div>
+      </div>
+
+      {/* Automatic Recurring Transactions Panel */}
+      <div className="rounded-2xl border border-indigo-200/80 bg-gradient-to-br from-indigo-50/70 via-white to-blue-50/50 p-4 sm:p-5 shadow-sm dark:border-indigo-900/50 dark:from-indigo-950/30 dark:via-slate-900 dark:to-slate-900">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-sm shadow-indigo-500/20">
+              <Repeat className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-sm font-bold text-slate-900 dark:text-white">
+                  {language === 'id' ? 'Jadwal Transaksi Berulang Otomatis' : 'Automatic Recurring Transactions'}
+                </h2>
+                <span className="rounded-md bg-indigo-100 px-2 py-0.5 text-[10px] font-bold text-indigo-700 dark:bg-indigo-950/80 dark:text-indigo-300">
+                  {recurringSummary.activeCount} {language === 'id' ? 'Aktif' : 'Active'}
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                {language === 'id'
+                  ? 'Transaksi rutin (langganan, tagihan, gaji, cicilan) dicatat otomatis saat tanggal jatuh tempo tiba.'
+                  : 'Scheduled transactions (subscriptions, bills, salary) are automatically recorded on their due date.'}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 self-end sm:self-center">
+            {recurringSummary.monthlyExpenseEstimate > 0 && (
+              <div className="hidden md:block text-right mr-2">
+                <span className="block text-[10px] text-slate-400">
+                  {language === 'id' ? 'Beban Rutin / Bulan' : 'Monthly Recurring Expense'}
+                </span>
+                <span className="font-mono text-xs font-bold text-rose-600 dark:text-rose-400 tabular-nums">
+                  -{formatCurrency(recurringSummary.monthlyExpenseEstimate, baseCurrency)}
+                </span>
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={() => setIsRecurringExpanded((prev) => !prev)}
+              className="flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 cursor-pointer"
+            >
+              <span>{isRecurringExpanded ? (language === 'id' ? 'Sembunyikan' : 'Hide') : (language === 'id' ? 'Kelola Jadwal' : 'Manage')}</span>
+              {isRecurringExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+            </button>
+          </div>
+        </div>
+
+        {recurringFeedback && (
+          <div className="mt-3 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50/90 px-3 py-2 text-xs font-semibold text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-300">
+            <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
+            <span>{recurringFeedback}</span>
+          </div>
+        )}
+
+        {recError && (
+          <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-600 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300">
+            {recError}
+          </div>
+        )}
+
+        {isRecurringExpanded && (
+          <div className="mt-4 space-y-3 border-t border-indigo-100 pt-4 dark:border-slate-800">
+            {/* Inline Create / Edit Recurring Schedule Form */}
+            {isRecurringFormOpen && (
+              <form
+                onSubmit={handleSaveRecurringForm}
+                className="rounded-xl border border-indigo-200 bg-white p-4 shadow-xs dark:border-slate-700 dark:bg-slate-900 space-y-3"
+              >
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                    <Repeat className="h-3.5 w-3.5 text-indigo-500" />
+                    <span>
+                      {editingRecurring
+                        ? (language === 'id' ? 'Edit Jadwal Transaksi Otomatis' : 'Edit Recurring Schedule')
+                        : (language === 'id' ? 'Tambah Jadwal Transaksi Otomatis Baru' : 'New Recurring Transaction Schedule')}
+                    </span>
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => { setIsRecurringFormOpen(false); setEditingRecurring(null); setRecError(''); }}
+                    className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  {/* Type */}
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                      {language === 'id' ? 'Tipe Transaksi' : 'Type'}
+                    </label>
+                    <select
+                      value={recType}
+                      onChange={(e) => setRecType(e.target.value as TransactionType)}
+                      className="h-9 w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 text-xs font-semibold text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 focus:outline-none"
+                    >
+                      <option value="expense">{t.typeExpense}</option>
+                      <option value="income">{t.typeIncome}</option>
+                      <option value="transfer">{t.typeTransfer}</option>
+                    </select>
+                  </div>
+
+                  {/* Description */}
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                      {language === 'id' ? 'Nama / Keterangan' : 'Description'}
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={recDesc}
+                      onChange={(e) => setRecDesc(e.target.value)}
+                      placeholder={language === 'id' ? 'cth: Netflix, Tagihan WiFi, Gaji' : 'e.g. Netflix, Internet Bill, Salary'}
+                      className="h-9 w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 text-xs font-medium text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white focus:outline-none"
+                    />
+                  </div>
+
+                  {/* Amount & Currency */}
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                      {t.amount}
+                    </label>
+                    <div className="flex h-9 rounded-lg border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800">
+                      <select
+                        value={recCurrency}
+                        onChange={(e) => setRecCurrency(e.target.value as SupportedCurrency)}
+                        className="border-r border-slate-200 bg-transparent px-2 text-xs font-bold text-slate-700 dark:border-slate-700 dark:text-slate-200 focus:outline-none"
+                      >
+                        <option value="IDR">IDR</option>
+                        <option value="USD">USD</option>
+                        <option value="EUR">EUR</option>
+                        <option value="SGD">SGD</option>
+                        <option value="MYR">MYR</option>
+                        <option value="JPY">JPY</option>
+                        <option value="GBP">GBP</option>
+                        <option value="AUD">AUD</option>
+                      </select>
+                      <input
+                        type="number"
+                        step="any"
+                        required
+                        value={recAmount}
+                        onChange={(e) => setRecAmount(e.target.value)}
+                        placeholder="0"
+                        className="w-full bg-transparent px-2.5 font-mono text-xs font-bold text-slate-900 dark:text-white focus:outline-none tabular-nums"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Frequency */}
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                      {language === 'id' ? 'Frekuensi Berulang' : 'Frequency'}
+                    </label>
+                    <select
+                      value={recFrequency}
+                      onChange={(e) => setRecFrequency(e.target.value as RecurringFrequency)}
+                      className="h-9 w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 text-xs font-semibold text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 focus:outline-none"
+                    >
+                      <option value="daily">{language === 'id' ? 'Harian (Setiap Hari)' : 'Daily'}</option>
+                      <option value="weekly">{language === 'id' ? 'Mingguan (Setiap Minggu)' : 'Weekly'}</option>
+                      <option value="monthly">{language === 'id' ? 'Bulanan (Setiap Bulan)' : 'Monthly'}</option>
+                      <option value="yearly">{language === 'id' ? 'Tahunan (Setiap Tahun)' : 'Yearly'}</option>
+                    </select>
+                  </div>
+
+                  {/* Source Wallet */}
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                      {t.fromWallet}
+                    </label>
+                    <select
+                      value={recSourceWalletId}
+                      onChange={(e) => setRecSourceWalletId(e.target.value)}
+                      className="h-9 w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 text-xs font-semibold text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 focus:outline-none"
+                    >
+                      {wallets.map((w) => (
+                        <option key={w.id} value={w.id}>
+                          {w.name} ({formatCurrency(w.balance, w.currency)})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Category or Target Wallet */}
+                  {recType === 'transfer' ? (
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                        {t.toWallet}
+                      </label>
+                      <select
+                        value={recTargetWalletId}
+                        onChange={(e) => setRecTargetWalletId(e.target.value)}
+                        className="h-9 w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 text-xs font-semibold text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 focus:outline-none"
+                      >
+                        {wallets.map((w) => (
+                          <option key={w.id} value={w.id}>
+                            {w.name} ({w.currency})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : (
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                        {t.category}
+                      </label>
+                      <select
+                        value={recCategoryId}
+                        onChange={(e) => setRecCategoryId(e.target.value)}
+                        className="h-9 w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 text-xs font-semibold text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 focus:outline-none"
+                      >
+                        {categories
+                          .filter((c) => (recType === 'income' ? c.type === 'income' : c.type === 'expense'))
+                          .map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {language === 'en' ? c.nameEn : c.name}
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {/* Next Run Date */}
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                      {language === 'id' ? 'Tanggal Eksekusi Berikutnya' : 'Next Run Date'}
+                    </label>
+                    <input
+                      type="date"
+                      required
+                      value={recNextRunDate}
+                      onChange={(e) => setRecNextRunDate(e.target.value)}
+                      className="h-9 w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 text-xs font-semibold text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 focus:outline-none"
+                    />
+                  </div>
+
+                  {/* End Date (Optional) */}
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                      {language === 'id' ? 'Tanggal Berakhir (Opsional)' : 'End Date (Optional)'}
+                    </label>
+                    <input
+                      type="date"
+                      value={recEndDate}
+                      onChange={(e) => setRecEndDate(e.target.value)}
+                      className="h-9 w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 text-xs font-semibold text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => { setIsRecurringFormOpen(false); setEditingRecurring(null); setRecError(''); }}
+                    className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 cursor-pointer"
+                  >
+                    {t.cancel}
+                  </button>
+                  <button
+                    type="submit"
+                    className="rounded-lg bg-indigo-600 px-4 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-indigo-500 cursor-pointer"
+                  >
+                    {editingRecurring
+                      ? (language === 'id' ? 'Simpan Perubahan' : 'Save Changes')
+                      : (language === 'id' ? 'Simpan Jadwal Otomatis' : 'Save Recurring Schedule')}
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* List of Recurring Schedules */}
+            {recurringTransactions.length === 0 ? (
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-dashed border-slate-200 bg-white/80 p-4 dark:border-slate-800 dark:bg-slate-900/60">
+                <div className="flex items-center gap-2.5 text-xs text-slate-500 dark:text-slate-400">
+                  <Clock className="h-4 w-4 text-slate-400 shrink-0" />
+                  <span>
+                    {language === 'id'
+                      ? 'Belum ada jadwal transaksi berulang. Buat jadwal untuk gaji bulanan, tagihan listrik/internet, atau langganan aplikasi.'
+                      : 'No automatic recurring schedules yet. Add schedules for monthly salary, utility bills, or subscriptions.'}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={openCreateRecurringForm}
+                  className="shrink-0 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-indigo-500 cursor-pointer"
+                >
+                  {language === 'id' ? '+ Buat Jadwal' : '+ Create Schedule'}
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {recurringTransactions.map((rule) => {
+                  const sourceW = wallets.find((w) => w.id === rule.sourceWalletId);
+                  const targetW = rule.targetWalletId ? wallets.find((w) => w.id === rule.targetWalletId) : null;
+                  const cat = categories.find((c) => c.id === rule.categoryId);
+                  const isRunning = runningRuleId === rule.id;
+
+                  return (
+                    <div
+                      key={rule.id}
+                      className={`flex flex-col justify-between gap-3 rounded-xl border p-3.5 transition-all ${
+                        rule.active
+                          ? 'border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900'
+                          : 'border-slate-200/60 bg-slate-50/70 opacity-75 dark:border-slate-800/60 dark:bg-slate-900/40'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                              {rule.description}
+                            </span>
+                            <span className="rounded-md bg-indigo-50 px-1.5 py-0.5 text-[10px] font-bold text-indigo-700 dark:bg-indigo-950/70 dark:text-indigo-300">
+                              {getFrequencyLabel(rule.frequency)}
+                            </span>
+                            <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold ${
+                              rule.active
+                                ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-300'
+                                : 'bg-slate-200 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
+                            }`}>
+                              {rule.active
+                                ? (language === 'id' ? 'Aktif' : 'Active')
+                                : (language === 'id' ? 'Dijeda' : 'Paused')}
+                            </span>
+                          </div>
+
+                          <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+                            <span>{sourceW?.name || rule.sourceWalletId}</span>
+                            {targetW && (
+                              <>
+                                <span>→</span>
+                                <span className="font-semibold text-blue-600 dark:text-blue-400">{targetW.name}</span>
+                              </>
+                            )}
+                            {cat && (
+                              <>
+                                <span>·</span>
+                                <span>{language === 'en' ? cat.nameEn : cat.name}</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="text-right font-mono text-xs font-bold tabular-nums shrink-0">
+                          <span className={
+                            rule.type === 'income'
+                              ? 'text-emerald-600 dark:text-emerald-400'
+                              : rule.type === 'expense'
+                              ? 'text-rose-600 dark:text-rose-400'
+                              : 'text-blue-600 dark:text-blue-400'
+                          }>
+                            {rule.type === 'income' ? '+' : rule.type === 'expense' ? '-' : ''}
+                            {formatCurrency(rule.amount, rule.currency)}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-2.5 dark:border-slate-800/80">
+                        <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                          <span>
+                            {language === 'id' ? 'Berikutnya: ' : 'Next: '}
+                            <strong className="font-mono text-slate-700 dark:text-slate-200">{rule.nextRunDate}</strong>
+                          </span>
+                          {rule.lastRunDate && (
+                            <span className="ml-2 text-slate-400">
+                              ({language === 'id' ? 'Terakhir: ' : 'Last: '}{rule.lastRunDate})
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            disabled={isRunning}
+                            onClick={() => handleRunRuleNow(rule)}
+                            title={language === 'id' ? 'Catat Transaksi Ini Sekarang' : 'Execute Now'}
+                            className="flex items-center gap-1 rounded-lg bg-indigo-50 px-2 py-1 text-[11px] font-bold text-indigo-600 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:text-indigo-300 dark:hover:bg-indigo-900/60 cursor-pointer disabled:opacity-50"
+                          >
+                            <Play className="h-3 w-3" />
+                            <span>{language === 'id' ? 'Jalankan' : 'Run Now'}</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => toggleRecurringTransaction(rule.id)}
+                            title={rule.active ? (language === 'id' ? 'Jeda Jadwal' : 'Pause') : (language === 'id' ? 'Aktifkan Jadwal' : 'Resume')}
+                            className="p-1.5 text-slate-500 hover:text-amber-600 hover:bg-amber-50 dark:text-slate-400 dark:hover:text-amber-400 dark:hover:bg-amber-950/40 rounded-lg cursor-pointer"
+                          >
+                            {rule.active ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => openEditRecurringForm(rule)}
+                            title={t.edit}
+                            className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 dark:text-slate-400 dark:hover:text-blue-400 dark:hover:bg-blue-950/40 rounded-lg cursor-pointer"
+                          >
+                            <Edit3 className="h-3.5 w-3.5" />
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => deleteRecurringTransaction(rule.id)}
+                            title={t.delete}
+                            className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:text-slate-400 dark:hover:text-rose-400 dark:hover:bg-rose-950/40 rounded-lg cursor-pointer"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Filter Bar */}
@@ -275,9 +885,17 @@ export const TransactionsView: React.FC = () => {
                         </div>
 
                         <div className="min-w-0">
-                          <h4 className="text-xs font-bold text-slate-900 dark:text-white truncate">
-                            {tx.description}
-                          </h4>
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <h4 className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                              {tx.description}
+                            </h4>
+                            {tx.recurringRuleId && (
+                              <span className="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-1.5 py-0.5 text-[10px] font-bold text-indigo-600 dark:bg-indigo-950/70 dark:text-indigo-300">
+                                <Repeat className="h-2.5 w-2.5" />
+                                <span>{language === 'id' ? 'Berulang' : 'Recurring'}</span>
+                              </span>
+                            )}
+                          </div>
                           <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
                             <span>{wallet?.name || tx.sourceWalletId}</span>
                             {targetWallet && (
@@ -369,3 +987,4 @@ export const TransactionsView: React.FC = () => {
     </div>
   );
 };
+

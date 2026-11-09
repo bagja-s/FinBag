@@ -2,10 +2,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useFinance } from '../../context/FinanceContext';
 import { getTranslation } from '../../i18n/translations';
-import { TransactionType, SupportedCurrency } from '../../types/finance';
+import { TransactionType, SupportedCurrency, RecurringFrequency } from '../../types/finance';
 import { predictCategory } from '../../utils/categoryMatcher';
 import { ConfirmationModal } from '../common/ConfirmationModal';
-import { formatCurrency } from '../../utils/financeCalculations';
+import { formatCurrency, calculateNextRecurringDate } from '../../utils/financeCalculations';
 import { 
   X, 
   ArrowDownLeft, 
@@ -20,7 +20,8 @@ import {
   Camera,
   Loader2,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Repeat
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { modalSpringVariants, backdropVariants } from '../../utils/motionVariants';
@@ -37,6 +38,7 @@ export const TransactionModal: React.FC = () => {
     categories, 
     addTransaction, 
     updateTransaction,
+    addRecurringTransaction,
     baseCurrency, 
     language 
   } = useFinance();
@@ -55,6 +57,11 @@ export const TransactionModal: React.FC = () => {
   const [description, setDescription] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
   const [errorMsg, setErrorMsg] = useState<string>('');
+
+  // Recurring Transaction state (for new transactions)
+  const [isRecurring, setIsRecurring] = useState<boolean>(false);
+  const [recurringFrequency, setRecurringFrequency] = useState<RecurringFrequency>('monthly');
+  const [recurringEndDate, setRecurringEndDate] = useState<string>('');
 
   // Auto-categorization indicator state
   const [autoDetectedCategory, setAutoDetectedCategory] = useState<string | null>(null);
@@ -83,6 +90,9 @@ export const TransactionModal: React.FC = () => {
       setDate(editingTransaction.date);
       setDescription(editingTransaction.description);
       setNotes(editingTransaction.notes || '');
+      setIsRecurring(false);
+      setRecurringFrequency('monthly');
+      setRecurringEndDate('');
       setAutoDetectedCategory(null);
       setUserManuallySelectedCategory(true);
       setErrorMsg('');
@@ -101,6 +111,9 @@ export const TransactionModal: React.FC = () => {
       setDate(new Date().toISOString().split('T')[0]);
       setDescription('');
       setNotes('');
+      setIsRecurring(false);
+      setRecurringFrequency('monthly');
+      setRecurringEndDate('');
       setAutoDetectedCategory(null);
       setUserManuallySelectedCategory(false);
       setErrorMsg('');
@@ -302,6 +315,26 @@ export const TransactionModal: React.FC = () => {
           description: description.trim(),
           notes: notes.trim() || undefined,
         });
+
+        if (isRecurring) {
+          const nextRunDate = calculateNextRecurringDate(date, recurringFrequency);
+          await addRecurringTransaction({
+            description: description.trim(),
+            amount: parsedAmount,
+            currency,
+            type,
+            sourceWalletId,
+            targetWalletId: type === 'transfer' ? targetWalletId : undefined,
+            categoryId: type !== 'transfer' ? categoryId : undefined,
+            frequency: recurringFrequency,
+            startDate: date,
+            nextRunDate,
+            lastRunDate: date,
+            endDate: recurringEndDate || undefined,
+            active: true,
+            notes: notes.trim() || undefined,
+          });
+        }
       }
 
       handleClose();
@@ -694,6 +727,80 @@ export const TransactionModal: React.FC = () => {
               </div>
             </div>
 
+            {/* Automatic Recurring Transaction Toggle (Add Mode) */}
+            {!isEditMode && (
+              <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 dark:border-slate-700/80 dark:bg-slate-800/40">
+                <label className="flex items-center justify-between cursor-pointer select-none">
+                  <div className="flex items-center gap-2.5">
+                    <div className={`flex h-8 w-8 items-center justify-center rounded-lg transition-colors ${
+                      isRecurring
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-slate-200 text-slate-500 dark:bg-slate-700 dark:text-slate-400'
+                    }`}>
+                      <Repeat className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <span className="block text-xs font-bold text-slate-800 dark:text-slate-200">
+                        {language === 'id' ? 'Transaksi Berulang Otomatis' : 'Automatic Recurring Transaction'}
+                      </span>
+                      <span className="block text-[10px] text-slate-500 dark:text-slate-400">
+                        {language === 'id'
+                          ? 'Catat otomatis secara berkala (gaji, cicilan, langganan, tagihan)'
+                          : 'Automatically record on a regular schedule (salary, bills, subscriptions)'}
+                      </span>
+                    </div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={isRecurring}
+                    onChange={(e) => setIsRecurring(e.target.checked)}
+                    className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                  />
+                </label>
+
+                {isRecurring && (
+                  <div className="mt-3 pt-3 border-t border-slate-200/80 dark:border-slate-700/70 space-y-2.5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                          {language === 'id' ? 'Frekuensi Pengulangan' : 'Repeat Frequency'}
+                        </label>
+                        <select
+                          value={recurringFrequency}
+                          onChange={(e) => setRecurringFrequency(e.target.value as RecurringFrequency)}
+                          className="h-9 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 focus:outline-none cursor-pointer"
+                        >
+                          <option value="daily">{language === 'id' ? 'Harian (Setiap Hari)' : 'Daily'}</option>
+                          <option value="weekly">{language === 'id' ? 'Mingguan (Setiap 7 Hari)' : 'Weekly'}</option>
+                          <option value="monthly">{language === 'id' ? 'Bulanan (Setiap Bulan)' : 'Monthly'}</option>
+                          <option value="yearly">{language === 'id' ? 'Tahunan (Setiap Tahun)' : 'Yearly'}</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                          {language === 'id' ? 'Berakhir Pada (Opsional)' : 'End Date (Optional)'}
+                        </label>
+                        <input
+                          type="date"
+                          value={recurringEndDate}
+                          min={calculateNextRecurringDate(date, recurringFrequency)}
+                          onChange={(e) => setRecurringEndDate(e.target.value)}
+                          className="h-9 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 focus:outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    <p className="text-[11px] text-indigo-600 dark:text-indigo-400 font-medium">
+                      {language === 'id'
+                        ? `Jadwal otomatis berikutnya: ${calculateNextRecurringDate(date, recurringFrequency)}`
+                        : `Next automatic run: ${calculateNextRecurringDate(date, recurringFrequency)}`}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Submit Action */}
             <div className="pt-2">
               <button
@@ -742,6 +849,10 @@ export const TransactionModal: React.FC = () => {
           ...(type === 'transfer' ? [{ label: language === 'id' ? 'Dompet Tujuan' : 'Destination Wallet', value: targetWalletObj?.name || '-' }] : []),
           ...(type !== 'transfer' ? [{ label: language === 'id' ? 'Kategori' : 'Category', value: currentCategoryName }] : []),
           { label: language === 'id' ? 'Tanggal' : 'Date', value: date },
+          ...(!isEditMode && isRecurring ? [{
+            label: language === 'id' ? 'Jadwal Berulang' : 'Recurring Schedule',
+            value: `${recurringFrequency.toUpperCase()} (Berikutnya: ${calculateNextRecurringDate(date, recurringFrequency)})`
+          }] : []),
         ]}
       />
     </>

@@ -53,9 +53,34 @@
         "description": { "type": "string", "maxLength": 200 },
         "notes": { "type": "string", "maxLength": 500 },
         "userId": { "type": "string", "maxLength": 128 },
-        "createdAt": { "type": "string" }
+        "createdAt": { "type": "string" },
+        "recurringRuleId": { "type": "string", "maxLength": 128 }
       },
       "required": ["date", "amount", "currency", "type", "sourceWalletId", "description", "userId"]
+    },
+    "recurringTransaction": {
+      "title": "RecurringTransaction",
+      "description": "Automatic recurring transaction schedule rule",
+      "type": "object",
+      "properties": {
+        "description": { "type": "string", "maxLength": 200 },
+        "amount": { "type": "number" },
+        "currency": { "type": "string", "maxLength": 5 },
+        "type": { "type": "string", "enum": ["expense", "income", "transfer"] },
+        "categoryId": { "type": "string", "maxLength": 50 },
+        "sourceWalletId": { "type": "string", "maxLength": 128 },
+        "targetWalletId": { "type": "string", "maxLength": 128 },
+        "frequency": { "type": "string", "enum": ["daily", "weekly", "monthly", "yearly"] },
+        "startDate": { "type": "string", "maxLength": 20 },
+        "nextRunDate": { "type": "string", "maxLength": 20 },
+        "endDate": { "type": "string", "maxLength": 20 },
+        "lastRunDate": { "type": "string", "maxLength": 20 },
+        "active": { "type": "boolean" },
+        "notes": { "type": "string", "maxLength": 500 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["description", "amount", "currency", "type", "sourceWalletId", "frequency", "startDate", "nextRunDate", "active", "userId"]
     },
     "budget": {
       "title": "Budget",
@@ -115,6 +140,10 @@
     "/users/{userId}/transactions/{transactionId}": {
       "schema": "transaction",
       "description": "Stores transaction ledger entries for the user"
+    },
+    "/users/{userId}/recurring_transactions/{recurringId}": {
+      "schema": "recurringTransaction",
+      "description": "Stores automatic recurring transaction schedules for the user"
     },
     "/users/{userId}/budgets/{budgetId}": {
       "schema": "budget",

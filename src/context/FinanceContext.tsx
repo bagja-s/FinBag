@@ -4,6 +4,7 @@ import {
   SupportedLanguage, 
   WalletAccount, 
   Transaction, 
+  RecurringTransaction,
   BudgetCategory, 
   SavingsGoal,
   UserProfile,
@@ -56,7 +57,12 @@ import {
   triggerTransactionReminderNotification,
   NotificationPermissionStatus 
 } from '../services/notificationService';
-import { formatCurrency, sortTransactionsNewestFirst } from '../utils/financeCalculations';
+import { 
+  formatCurrency, 
+  sortTransactionsNewestFirst, 
+  calculateNextRecurringDate, 
+  getDueRecurringOccurrences 
+} from '../utils/financeCalculations';
 
 interface FinanceContextType {
   // User & Auth
@@ -131,6 +137,7 @@ interface FinanceContextType {
   // Data
   wallets: WalletAccount[];
   transactions: Transaction[];
+  recurringTransactions: RecurringTransaction[];
   categories: BudgetCategory[];
   goals: SavingsGoal[];
   exchangeRates: RatesData;
@@ -141,6 +148,12 @@ interface FinanceContextType {
   addTransaction: (tx: Omit<Transaction, 'id'>) => Promise<void>;
   updateTransaction: (id: string, updatedTx: Omit<Transaction, 'id' | 'userId' | 'createdAt'>) => Promise<void>;
   deleteTransaction: (id: string) => Promise<void>;
+  addRecurringTransaction: (rule: Omit<RecurringTransaction, 'id' | 'userId' | 'createdAt'>) => Promise<void>;
+  updateRecurringTransaction: (id: string, updated: Partial<Omit<RecurringTransaction, 'id' | 'userId' | 'createdAt'>>) => Promise<void>;
+  deleteRecurringTransaction: (id: string) => Promise<void>;
+  toggleRecurringTransaction: (id: string) => Promise<void>;
+  executeRecurringTransactionNow: (id: string) => Promise<void>;
+  processDueRecurringTransactions: () => Promise<number>;
   addWallet: (wallet: Omit<WalletAccount, 'id'>) => Promise<void>;
   updateWallet: (id: string, updated: Omit<WalletAccount, 'id' | 'userId'>) => Promise<void>;
   deleteWallet: (id: string) => Promise<void>;
@@ -348,6 +361,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
   // Financial Data - strictly empty initial state directly loaded from user database
   const [wallets, setWallets] = useState<WalletAccount[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [recurringTransactions, setRecurringTransactions] = useState<RecurringTransaction[]>([]);
   const [categories, setCategories] = useState<BudgetCategory[]>(() => {
     const saved = localStorage.getItem(`${LOCAL_STORAGE_PREFIX}categories`);
     if (!saved) return INITIAL_CATEGORIES;
@@ -572,6 +586,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
       setCurrentUserProfile(null);
       setAppPinState(null);
       setIsAppUnlocked(true);
+      setRecurringTransactions([]);
       setAuditLogs([]);
       return;
     }
@@ -724,6 +739,34 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
       (error) => handleFirestoreError(error, OperationType.GET, goalsPath)
     );
 
+    // Listen to recurring transactions from Firestore (with localStorage fallback)
+    const recurringStorageKey = `${LOCAL_STORAGE_PREFIX}recurring_${userId}`;
+    const cachedRecurring = localStorage.getItem(recurringStorageKey);
+    if (cachedRecurring) {
+      try {
+        setRecurringTransactions(JSON.parse(cachedRecurring));
+      } catch {
+        // ignore invalid cache
+      }
+    }
+
+    const recurringPath = `users/${userId}/recurring_transactions`;
+    const unsubscribeRecurring = onSnapshot(
+      collection(db, recurringPath),
+      (snapshot) => {
+        const cloudRecurring: RecurringTransaction[] = [];
+        snapshot.forEach((d) => {
+          cloudRecurring.push({ id: d.id, ...d.data() } as RecurringTransaction);
+        });
+        cloudRecurring.sort((a, b) => (a.nextRunDate || '').localeCompare(b.nextRunDate || ''));
+        setRecurringTransactions(cloudRecurring);
+        localStorage.setItem(recurringStorageKey, JSON.stringify(cloudRecurring));
+      },
+      (error) => {
+        console.warn('Recurring transactions read warning:', error);
+      }
+    );
+
     // Listen to audit logs directly from Firestore
     const auditLogsPath = `users/${userId}/audit_logs`;
     const unsubscribeAudit = onSnapshot(
@@ -745,6 +788,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
       unsubscribeTxs();
       unsubscribeBudgets();
       unsubscribeGoals();
+      unsubscribeRecurring();
       unsubscribeAudit();
     };
   }, [user]);
@@ -857,6 +901,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     setIsAppUnlocked(true);
     setWallets([]);
     setTransactions([]);
+    setRecurringTransactions([]);
     setGoals([]);
     setAuditLogs([]);
     reconciledOnceRef.current = false;
@@ -1220,6 +1265,233 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
       { transactionId: id, amount: txToDelete.amount, currency: txToDelete.currency }
     );
   };
+
+  // Recurring Transaction CRUD & Auto-Execution Engine
+  const persistRecurringItem = async (item: RecurringTransaction) => {
+    if (!user) return;
+    const recurringStorageKey = `${LOCAL_STORAGE_PREFIX}recurring_${user.uid}`;
+    setRecurringTransactions((prev) => {
+      const exists = prev.some((r) => r.id === item.id);
+      const next = exists ? prev.map((r) => (r.id === item.id ? item : r)) : [...prev, item];
+      next.sort((a, b) => (a.nextRunDate || '').localeCompare(b.nextRunDate || ''));
+      localStorage.setItem(recurringStorageKey, JSON.stringify(next));
+      return next;
+    });
+
+    const path = `users/${user.uid}/recurring_transactions`;
+    try {
+      await setDoc(doc(db, path, item.id), cleanFirestoreData(item), { merge: true });
+    } catch (err) {
+      console.warn('Recurring persist warning:', err);
+    }
+  };
+
+  const addRecurringTransaction = async (
+    ruleData: Omit<RecurringTransaction, 'id' | 'userId' | 'createdAt'>
+  ) => {
+    const newId = `rec_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const newRule: RecurringTransaction = {
+      ...ruleData,
+      id: newId,
+      userId: user?.uid || 'local_user',
+      createdAt: new Date().toISOString(),
+    };
+
+    await persistRecurringItem(newRule);
+
+    logActivity(
+      'CREATE',
+      'TRANSACTION',
+      `Buat jadwal transaksi otomatis (${newRule.frequency}): ${newRule.description} (${formatCurrency(newRule.amount, newRule.currency)})`,
+      { recurringId: newId, frequency: newRule.frequency, nextRunDate: newRule.nextRunDate }
+    );
+  };
+
+  const updateRecurringTransaction = async (
+    id: string,
+    updatedData: Partial<Omit<RecurringTransaction, 'id' | 'userId' | 'createdAt'>>
+  ) => {
+    const existing = recurringTransactions.find((r) => r.id === id);
+    if (!existing) return;
+
+    const updatedRule: RecurringTransaction = {
+      ...existing,
+      ...updatedData,
+      id,
+      userId: user?.uid || existing.userId || 'local_user',
+    };
+
+    await persistRecurringItem(updatedRule);
+
+    logActivity(
+      'UPDATE',
+      'TRANSACTION',
+      `Perbarui jadwal transaksi otomatis: ${updatedRule.description}`,
+      { recurringId: id, nextRunDate: updatedRule.nextRunDate, active: updatedRule.active }
+    );
+  };
+
+  const deleteRecurringTransaction = async (id: string) => {
+    const target = recurringTransactions.find((r) => r.id === id);
+    if (!target) return;
+
+    setRecurringTransactions((prev) => {
+      const next = prev.filter((r) => r.id !== id);
+      if (user) {
+        localStorage.setItem(`${LOCAL_STORAGE_PREFIX}recurring_${user.uid}`, JSON.stringify(next));
+      }
+      return next;
+    });
+
+    if (user) {
+      const path = `users/${user.uid}/recurring_transactions`;
+      try {
+        await deleteDoc(doc(db, path, id));
+      } catch (err) {
+        console.warn('Delete recurring warning:', err);
+      }
+    }
+
+    logActivity(
+      'DELETE',
+      'TRANSACTION',
+      `Hapus jadwal transaksi otomatis: ${target.description}`,
+      { recurringId: id }
+    );
+  };
+
+  const toggleRecurringTransaction = async (id: string) => {
+    const existing = recurringTransactions.find((r) => r.id === id);
+    if (!existing) return;
+    await updateRecurringTransaction(id, { active: !existing.active });
+  };
+
+  const executeRecurringTransactionNow = async (id: string) => {
+    const rule = recurringTransactions.find((r) => r.id === id);
+    if (!rule) return;
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    const runDate = rule.nextRunDate <= todayStr ? rule.nextRunDate : todayStr;
+
+    await addTransaction({
+      date: runDate,
+      amount: rule.amount,
+      currency: rule.currency,
+      type: rule.type,
+      categoryId: rule.type !== 'transfer' ? rule.categoryId : undefined,
+      sourceWalletId: rule.sourceWalletId,
+      targetWalletId: rule.type === 'transfer' ? rule.targetWalletId : undefined,
+      description: `${rule.description} (Otomatis)`,
+      notes: rule.notes ? `${rule.notes} · [Jadwal Berulang]` : '[Jadwal Transaksi Berulang Otomatis]',
+      recurringRuleId: rule.id,
+    });
+
+    const nextDate = calculateNextRecurringDate(runDate, rule.frequency);
+    const shouldDeactivate = Boolean(rule.endDate && nextDate > rule.endDate);
+
+    await updateRecurringTransaction(rule.id, {
+      lastRunDate: runDate,
+      nextRunDate: nextDate,
+      active: shouldDeactivate ? false : rule.active,
+    });
+  };
+
+  const isProcessingRecurringRef = useRef(false);
+
+  const processDueRecurringTransactions = async (): Promise<number> => {
+    if (isProcessingRecurringRef.current || wallets.length === 0 || recurringTransactions.length === 0) {
+      return 0;
+    }
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    const dueRules = recurringTransactions.filter((r) => r.active && r.nextRunDate && r.nextRunDate <= todayStr);
+    if (dueRules.length === 0) return 0;
+
+    isProcessingRecurringRef.current = true;
+    let executedCount = 0;
+
+    try {
+      for (const rule of dueRules) {
+        const { dueDates, updatedNextRunDate, shouldDeactivate } = getDueRecurringOccurrences(rule, todayStr, 6);
+        if (dueDates.length === 0) {
+          if (shouldDeactivate) {
+            await persistRecurringItem({ ...rule, active: false });
+          }
+          continue;
+        }
+
+        let lastSuccessfulDate = rule.lastRunDate;
+        let haltedDueToBalance = false;
+        let nextScheduledDate = updatedNextRunDate;
+
+        for (const dueDate of dueDates) {
+          // Idempotency guard: skip if a transaction for this rule & date already exists
+          const alreadyCreated = transactions.some(
+            (tx) => tx.recurringRuleId === rule.id && tx.date === dueDate
+          );
+          if (alreadyCreated) {
+            lastSuccessfulDate = dueDate;
+            continue;
+          }
+
+          // Check wallet balance before auto-executing expense/transfer
+          if (rule.type === 'expense' || rule.type === 'transfer') {
+            const sourceW = wallets.find((w) => w.id === rule.sourceWalletId);
+            if (!sourceW || sourceW.balance <= 0 || sourceW.balance < rule.amount) {
+              haltedDueToBalance = true;
+              nextScheduledDate = dueDate;
+              break;
+            }
+          }
+
+          try {
+            await addTransaction({
+              date: dueDate,
+              amount: rule.amount,
+              currency: rule.currency,
+              type: rule.type,
+              categoryId: rule.type !== 'transfer' ? rule.categoryId : undefined,
+              sourceWalletId: rule.sourceWalletId,
+              targetWalletId: rule.type === 'transfer' ? rule.targetWalletId : undefined,
+              description: `${rule.description} (Otomatis)`,
+              notes: rule.notes ? `${rule.notes} · [Jadwal Berulang]` : '[Jadwal Transaksi Berulang Otomatis]',
+              recurringRuleId: rule.id,
+            });
+            lastSuccessfulDate = dueDate;
+            executedCount += 1;
+          } catch (err) {
+            console.warn('Auto-recurring execution skipped for rule:', rule.id, err);
+            haltedDueToBalance = true;
+            nextScheduledDate = dueDate;
+            break;
+          }
+        }
+
+        await persistRecurringItem({
+          ...rule,
+          lastRunDate: lastSuccessfulDate,
+          nextRunDate: nextScheduledDate,
+          active: !haltedDueToBalance && shouldDeactivate ? false : rule.active,
+        });
+      }
+    } finally {
+      isProcessingRecurringRef.current = false;
+    }
+
+    return executedCount;
+  };
+
+  // Automatically process any due recurring transactions when wallets & rules are ready
+  useEffect(() => {
+    if (!user || isAuthLoading || wallets.length === 0 || recurringTransactions.length === 0) {
+      return;
+    }
+    const todayStr = new Date().toISOString().split('T')[0];
+    const hasDue = recurringTransactions.some((r) => r.active && r.nextRunDate && r.nextRunDate <= todayStr);
+    if (hasDue) {
+      processDueRecurringTransactions().catch(console.warn);
+    }
+  }, [user, isAuthLoading, wallets.length, recurringTransactions]);
 
   // Wallet mutations
   const addWallet = async (walletData: Omit<WalletAccount, 'id'>) => {
@@ -1639,6 +1911,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
         openAddTransactionWithWallet,
         wallets,
         transactions,
+        recurringTransactions,
         categories,
         goals,
         exchangeRates,
@@ -1647,6 +1920,12 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
         addTransaction,
         updateTransaction,
         deleteTransaction,
+        addRecurringTransaction,
+        updateRecurringTransaction,
+        deleteRecurringTransaction,
+        toggleRecurringTransaction,
+        executeRecurringTransactionNow,
+        processDueRecurringTransactions,
         addWallet,
         updateWallet,
         deleteWallet,
