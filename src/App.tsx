@@ -111,13 +111,13 @@ const MainLayout: React.FC = () => {
       {/* Sticky Header TopBar */}
       <TopBar />
 
-      {/* Main Body with Desktop Sidebar & Mobile Content */}
-      <div className="mx-auto flex max-w-7xl">
+      {/* Main Body with Desktop Sidebar & Full-Width Content Canvas */}
+      <div className="flex w-full min-h-[calc(100vh-3.5rem)]">
         {/* Desktop Sidebar */}
         <Sidebar />
 
         {/* Viewport Canvas */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-full overflow-x-hidden min-h-[calc(100vh-3.5rem)]">
+        <main className="flex-1 w-full min-w-0 p-4 sm:p-6 lg:px-8 lg:py-6 overflow-x-hidden min-h-[calc(100vh-3.5rem)]">
           {/* System Announcement Notice (if set by Creator) */}
           {announcementNotice && (
             <div className="mb-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 px-4 py-3 text-xs font-semibold text-amber-800 dark:text-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-xs">

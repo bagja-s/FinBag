@@ -56,7 +56,7 @@ import {
   triggerTransactionReminderNotification,
   NotificationPermissionStatus 
 } from '../services/notificationService';
-import { formatCurrency } from '../utils/financeCalculations';
+import { formatCurrency, sortTransactionsNewestFirst } from '../utils/financeCalculations';
 
 interface FinanceContextType {
   // User & Auth
@@ -146,6 +146,7 @@ interface FinanceContextType {
   deleteWallet: (id: string) => Promise<void>;
   transferFunds: (sourceId: string, targetId: string, amount: number, currency: SupportedCurrency) => Promise<void>;
   updateBudgetLimit: (categoryId: string, limit: number) => Promise<void>;
+  batchUpdateBudgetLimits: (limitsMap: Record<string, number>) => Promise<void>;
   addGoal: (goal: Omit<SavingsGoal, 'id' | 'currentAmount'>) => Promise<void>;
   contributeToGoal: (goalId: string, walletId: string, amount: number) => Promise<void>;
 
@@ -386,6 +387,11 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     localStorage.removeItem(`${LOCAL_STORAGE_PREFIX}transactions`);
     localStorage.removeItem(`${LOCAL_STORAGE_PREFIX}goals`);
   }, []);
+
+  // Persist categories (budget limits) to localStorage whenever updated
+  useEffect(() => {
+    localStorage.setItem(`${LOCAL_STORAGE_PREFIX}categories`, JSON.stringify(categories));
+  }, [categories]);
 
   // Keep selectedWalletDetail in sync with latest wallets updates
   useEffect(() => {
@@ -671,10 +677,37 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
         snapshot.forEach((d) => {
           cloudTxs.push({ id: d.id, ...d.data() } as Transaction);
         });
-        cloudTxs.sort((a, b) => b.date.localeCompare(a.date));
+        cloudTxs.sort(sortTransactionsNewestFirst);
         setTransactions(cloudTxs);
       },
       (error) => handleFirestoreError(error, OperationType.GET, txsPath)
+    );
+
+    // Listen to budgets directly from Firestore
+    const budgetsPath = `users/${userId}/budgets`;
+    const unsubscribeBudgets = onSnapshot(
+      collection(db, budgetsPath),
+      (snapshot) => {
+        if (!snapshot.empty) {
+          const cloudLimits = new Map<string, number>();
+          snapshot.forEach((d) => {
+            const data = d.data();
+            if (typeof data.monthlyLimit === 'number') {
+              cloudLimits.set(d.id, data.monthlyLimit);
+            }
+          });
+          if (cloudLimits.size > 0) {
+            setCategories((prev) =>
+              prev.map((cat) =>
+                cloudLimits.has(cat.id)
+                  ? { ...cat, monthlyLimit: cloudLimits.get(cat.id)! }
+                  : cat
+              )
+            );
+          }
+        }
+      },
+      (error) => handleFirestoreError(error, OperationType.GET, budgetsPath)
     );
 
     // Listen to goals directly from Firestore
@@ -710,6 +743,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
       unsubscribeProfile();
       unsubscribeWallets();
       unsubscribeTxs();
+      unsubscribeBudgets();
       unsubscribeGoals();
       unsubscribeAudit();
     };
@@ -916,7 +950,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
       return updated;
     });
 
-    setTransactions((prev) => [newTx, ...prev]);
+    setTransactions((prev) => [newTx, ...prev].sort(sortTransactionsNewestFirst));
 
     // Push Notification trigger: check budget limits on expense transactions if enabled
     if (notificationPreferences.budgetAlerts && newTx.type === 'expense' && newTx.categoryId) {
@@ -1082,7 +1116,9 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
       return updated;
     });
 
-    setTransactions((prev) => prev.map((t) => (t.id === id ? updatedTx : t)));
+    setTransactions((prev) =>
+      prev.map((t) => (t.id === id ? updatedTx : t)).sort(sortTransactionsNewestFirst)
+    );
 
     // Sync to Firestore
     if (user) {
@@ -1313,6 +1349,46 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
       'BUDGET',
       `Perbarui pagu anggaran kategori ${categoryId}: ${formatCurrency(limit, baseCurrency)}/bulan`,
       { categoryId, limit }
+    );
+  };
+
+  // Batch update multiple budget limits (used by Auto Budget)
+  const batchUpdateBudgetLimits = async (limitsMap: Record<string, number>) => {
+    const entries = Object.entries(limitsMap);
+    if (entries.length === 0) return;
+
+    setCategories((prev) =>
+      prev.map((c) =>
+        Object.prototype.hasOwnProperty.call(limitsMap, c.id)
+          ? { ...c, monthlyLimit: limitsMap[c.id] }
+          : c
+      )
+    );
+
+    if (user) {
+      const path = `users/${user.uid}/budgets`;
+      for (const [categoryId, limit] of entries) {
+        try {
+          await setDoc(
+            doc(db, path, categoryId),
+            cleanFirestoreData({
+              categoryName: categoryId,
+              monthlyLimit: limit,
+              currency: baseCurrency,
+              userId: user.uid,
+            })
+          );
+        } catch (err) {
+          handleFirestoreError(err, OperationType.WRITE, path);
+        }
+      }
+    }
+
+    logActivity(
+      'UPDATE',
+      'BUDGET',
+      `Terapkan Auto Budget otomatis pada ${entries.length} kategori pengeluaran`,
+      { updatedCount: entries.length, limitsMap }
     );
   };
 
@@ -1576,6 +1652,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
         deleteWallet,
         transferFunds,
         updateBudgetLimit,
+        batchUpdateBudgetLimits,
         addGoal,
         contributeToGoal,
         auditLogs,

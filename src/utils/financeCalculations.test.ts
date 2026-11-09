@@ -7,8 +7,10 @@ import {
   calculateBudgetHealth,
   calculateSplitBill,
   filterTransactionsList,
+  groupTransactionsByDate,
+  calculateAutoBudgetSuggestions,
 } from './financeCalculations';
-import { WalletAccount, Transaction } from '../types/finance';
+import { WalletAccount, Transaction, BudgetCategory } from '../types/finance';
 
 test('formatCurrency correctly formats IDR with Rp prefix and thousands separators', () => {
   const result = formatCurrency(1500000, 'IDR');
@@ -84,3 +86,38 @@ test('filterTransactionsList filters by search query and type', () => {
   assert.equal(incomes.length, 1);
   assert.equal(incomes[0].id, '3');
 });
+
+test('groupTransactionsByDate sorts newest dates first and newest transactions within the same date first', () => {
+  const mockTxs: Transaction[] = [
+    { id: 'tx_100', date: '2026-11-05', createdAt: '2026-11-05T08:00:00Z', amount: 25000, currency: 'IDR', type: 'expense', sourceWalletId: 'w1', description: 'Sarapan' },
+    { id: 'tx_300', date: '2026-11-08', createdAt: '2026-11-08T18:00:00Z', amount: 75000, currency: 'IDR', type: 'expense', sourceWalletId: 'w1', description: 'Makan Malam' },
+    { id: 'tx_200', date: '2026-11-08', createdAt: '2026-11-08T12:00:00Z', amount: 50000, currency: 'IDR', type: 'expense', sourceWalletId: 'w1', description: 'Makan Siang' },
+  ];
+
+  const groups = groupTransactionsByDate(mockTxs);
+  assert.equal(groups.length, 2);
+  assert.equal(groups[0].date, '2026-11-08');
+  assert.equal(groups[0].transactions[0].id, 'tx_300');
+  assert.equal(groups[0].transactions[1].id, 'tx_200');
+  assert.equal(groups[0].dailyExpense, 125000);
+  assert.equal(groups[1].date, '2026-11-05');
+});
+
+test('calculateAutoBudgetSuggestions computes suggested budget from historical transactions', () => {
+  const mockCategories: BudgetCategory[] = [
+    { id: 'food', name: 'Makanan', nameEn: 'Food', icon: 'Utensils', color: '#F59E0B', monthlyLimit: 500000, type: 'expense', budgetGroup: 'needs' },
+  ];
+  const mockTxs: Transaction[] = [
+    { id: '1', date: '2026-10-10', amount: 1000000, currency: 'IDR', type: 'expense', categoryId: 'food', sourceWalletId: 'w1', description: 'Makan Oktober' },
+    { id: '2', date: '2026-11-05', amount: 1000000, currency: 'IDR', type: 'expense', categoryId: 'food', sourceWalletId: 'w1', description: 'Makan November' },
+  ];
+
+  const balanced = calculateAutoBudgetSuggestions(mockTxs, mockCategories, '2026-11', 'balanced');
+  assert.equal(balanced.length, 1);
+  assert.equal(balanced[0].historicalAvg, 1000000);
+  assert.equal(balanced[0].suggestedLimit, 1000000);
+
+  const flexible = calculateAutoBudgetSuggestions(mockTxs, mockCategories, '2026-11', 'flexible');
+  assert.equal(flexible[0].suggestedLimit, 1150000);
+});
+

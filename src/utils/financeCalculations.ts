@@ -238,6 +238,14 @@ export function calculateSplitBill(
   };
 }
 
+export function sortTransactionsNewestFirst(a: Transaction, b: Transaction): number {
+  const dateDiff = (b.date || '').localeCompare(a.date || '');
+  if (dateDiff !== 0) return dateDiff;
+  const timeA = a.createdAt || a.id || '';
+  const timeB = b.createdAt || b.id || '';
+  return timeB.localeCompare(timeA);
+}
+
 export function filterTransactionsList(
   transactions: Transaction[],
   filters: {
@@ -249,30 +257,191 @@ export function filterTransactionsList(
     endDate?: string;
   }
 ): Transaction[] {
-  return transactions.filter((tx) => {
-    if (filters.query) {
-      const q = filters.query.toLowerCase();
-      const matchDesc = tx.description.toLowerCase().includes(q);
-      const matchNotes = tx.notes ? tx.notes.toLowerCase().includes(q) : false;
-      if (!matchDesc && !matchNotes) return false;
-    }
-    if (filters.walletId && filters.walletId !== 'all') {
-      if (tx.sourceWalletId !== filters.walletId && tx.targetWalletId !== filters.walletId) {
+  return transactions
+    .filter((tx) => {
+      if (filters.query) {
+        const q = filters.query.toLowerCase();
+        const matchDesc = tx.description.toLowerCase().includes(q);
+        const matchNotes = tx.notes ? tx.notes.toLowerCase().includes(q) : false;
+        if (!matchDesc && !matchNotes) return false;
+      }
+      if (filters.walletId && filters.walletId !== 'all') {
+        if (tx.sourceWalletId !== filters.walletId && tx.targetWalletId !== filters.walletId) {
+          return false;
+        }
+      }
+      if (filters.categoryId && filters.categoryId !== 'all') {
+        if (tx.categoryId !== filters.categoryId) return false;
+      }
+      if (filters.type && filters.type !== 'all') {
+        if (tx.type !== filters.type) return false;
+      }
+      if (filters.startDate && tx.date < filters.startDate) {
         return false;
       }
-    }
-    if (filters.categoryId && filters.categoryId !== 'all') {
-      if (tx.categoryId !== filters.categoryId) return false;
-    }
-    if (filters.type && filters.type !== 'all') {
-      if (tx.type !== filters.type) return false;
-    }
-    if (filters.startDate && tx.date < filters.startDate) {
-      return false;
-    }
-    if (filters.endDate && tx.date > filters.endDate) {
-      return false;
-    }
-    return true;
-  });
+      if (filters.endDate && tx.date > filters.endDate) {
+        return false;
+      }
+      return true;
+    })
+    .sort(sortTransactionsNewestFirst);
 }
+
+export interface TransactionDateGroup {
+  date: string;
+  transactions: Transaction[];
+  dailyIncome: number;
+  dailyExpense: number;
+}
+
+export function groupTransactionsByDate(
+  transactions: Transaction[],
+  ratesFromUsd: Record<SupportedCurrency, number> = FALLBACK_RATES_FROM_USD,
+  targetCurrency: SupportedCurrency = 'IDR'
+): TransactionDateGroup[] {
+  const sorted = [...transactions].sort(sortTransactionsNewestFirst);
+  const groupsMap = new Map<string, TransactionDateGroup>();
+
+  sorted.forEach((tx) => {
+    const dateKey = tx.date || 'Unknown';
+    let group = groupsMap.get(dateKey);
+    if (!group) {
+      group = {
+        date: dateKey,
+        transactions: [],
+        dailyIncome: 0,
+        dailyExpense: 0,
+      };
+      groupsMap.set(dateKey, group);
+    }
+    group.transactions.push(tx);
+
+    const converted = convertCurrency(tx.amount, tx.currency, targetCurrency, ratesFromUsd);
+    if (tx.type === 'income') {
+      group.dailyIncome += converted;
+    } else if (tx.type === 'expense') {
+      group.dailyExpense += converted;
+    }
+  });
+
+  return Array.from(groupsMap.values());
+}
+
+export type AutoBudgetStrategy = 'saver' | 'balanced' | 'flexible';
+
+export interface AutoBudgetSuggestion {
+  categoryId: string;
+  historicalAvg: number;
+  lastMonthSpent: number;
+  currentMonthSpent: number;
+  activeMonthsCount: number;
+  currentLimit: number;
+  suggestedLimit: number;
+  txCount: number;
+}
+
+function roundBudgetAmount(amount: number, currency: SupportedCurrency): number {
+  if (amount <= 0) return 0;
+  if (currency === 'IDR') {
+    if (amount < 50000) return Math.ceil(amount / 5000) * 5000;
+    if (amount < 500000) return Math.ceil(amount / 10000) * 10000;
+    return Math.ceil(amount / 25000) * 25000;
+  }
+  if (currency === 'JPY') {
+    return Math.ceil(amount / 500) * 500;
+  }
+  if (amount < 20) return Math.ceil(amount);
+  return Math.ceil(amount / 5) * 5;
+}
+
+export function calculateAutoBudgetSuggestions(
+  transactions: Transaction[],
+  categories: BudgetCategory[],
+  currentMonthStr: string, // YYYY-MM
+  strategy: AutoBudgetStrategy = 'balanced',
+  ratesFromUsd: Record<SupportedCurrency, number> = FALLBACK_RATES_FROM_USD,
+  targetCurrency: SupportedCurrency = 'IDR'
+): AutoBudgetSuggestion[] {
+  const multiplier = strategy === 'saver' ? 0.9 : strategy === 'flexible' ? 1.15 : 1.0;
+
+  // Determine previous month string YYYY-MM
+  const [yr, mo] = currentMonthStr.split('-').map(Number);
+  const prevDate = new Date(yr, mo - 2, 1);
+  const lastMonthStr = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`;
+
+  const expenseCategories = categories.filter((c) => c.type === 'expense');
+
+  // Map: categoryId -> Map<monthStr, totalInTargetCurrency>
+  const catMonthTotals = new Map<string, Map<string, number>>();
+  const catTxCounts = new Map<string, number>();
+
+  transactions.forEach((tx) => {
+    if (tx.type !== 'expense' || !tx.categoryId || !tx.date) return;
+    const monthKey = tx.date.slice(0, 7);
+    const converted = convertCurrency(tx.amount, tx.currency, targetCurrency, ratesFromUsd);
+
+    if (!catMonthTotals.has(tx.categoryId)) {
+      catMonthTotals.set(tx.categoryId, new Map());
+    }
+    const monthMap = catMonthTotals.get(tx.categoryId)!;
+    monthMap.set(monthKey, (monthMap.get(monthKey) || 0) + converted);
+    catTxCounts.set(tx.categoryId, (catTxCounts.get(tx.categoryId) || 0) + 1);
+  });
+
+  const suggestions: AutoBudgetSuggestion[] = [];
+
+  expenseCategories.forEach((cat) => {
+    const monthMap = catMonthTotals.get(cat.id);
+    const txCount = catTxCounts.get(cat.id) || 0;
+    if (!monthMap || txCount === 0) return;
+
+    const currentMonthSpent = monthMap.get(currentMonthStr) || 0;
+    const lastMonthSpent = monthMap.get(lastMonthStr) || 0;
+
+    // Collect past months (< currentMonthStr)
+    const pastMonths: number[] = [];
+    monthMap.forEach((val, mKey) => {
+      if (mKey < currentMonthStr && val > 0) {
+        pastMonths.push(val);
+      }
+    });
+
+    let baseAvg = 0;
+    let activeMonthsCount = 0;
+
+    if (pastMonths.length > 0 && currentMonthSpent > 0) {
+      // Blend past months and current month if current month exceeds past average, or average all active months
+      const allActive = [...pastMonths, currentMonthSpent];
+      baseAvg = allActive.reduce((s, v) => s + v, 0) / allActive.length;
+      activeMonthsCount = allActive.length;
+    } else if (pastMonths.length > 0) {
+      baseAvg = pastMonths.reduce((s, v) => s + v, 0) / pastMonths.length;
+      activeMonthsCount = pastMonths.length;
+    } else {
+      // Only current month data exists
+      baseAvg = currentMonthSpent;
+      activeMonthsCount = 1;
+    }
+
+    const rawSuggested = baseAvg * multiplier;
+    const suggestedLimit = roundBudgetAmount(rawSuggested, targetCurrency);
+
+    if (suggestedLimit > 0) {
+      suggestions.push({
+        categoryId: cat.id,
+        historicalAvg: Math.round(baseAvg),
+        lastMonthSpent: Math.round(lastMonthSpent),
+        currentMonthSpent: Math.round(currentMonthSpent),
+        activeMonthsCount,
+        currentLimit: cat.monthlyLimit || 0,
+        suggestedLimit,
+        txCount,
+      });
+    }
+  });
+
+  // Sort by highest suggested limit first
+  suggestions.sort((a, b) => b.suggestedLimit - a.suggestedLimit);
+  return suggestions;
+}
+

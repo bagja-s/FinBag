@@ -23,7 +23,6 @@ import {
   AlertTriangle, 
   CheckCircle2, 
   TrendingDown, 
-  TrendingUp, 
   Target, 
   SlidersHorizontal 
 } from 'lucide-react';
@@ -44,12 +43,12 @@ export const MonthlyBudgetReport: React.FC = () => {
   // Generate current month in YYYY-MM
   const currentMonthStr = useMemo(() => new Date().toISOString().slice(0, 7), []);
   const [selectedMonth, setSelectedMonth] = useState<string>(currentMonthStr);
+  const [chartFilter, setChartFilter] = useState<'active' | 'all'>('all');
 
   // Generate the last 12 months for selector
   const availableMonths = useMemo(() => {
     const list: { key: string; label: string }[] = [];
     const date = new Date();
-    // Start from current month and go 11 months back
     for (let i = 0; i < 12; i++) {
       const d = new Date(date.getFullYear(), date.getMonth() - i, 1);
       const key = d.toISOString().slice(0, 7);
@@ -98,7 +97,7 @@ export const MonthlyBudgetReport: React.FC = () => {
   }, [transactions, selectedMonth, exchangeRates.rates, baseCurrency]);
 
   // Prepare chart and summary comparison data
-  const { chartData, totalActual, totalBudget, overbudgetItems } = useMemo(() => {
+  const { chartData, activeSpendingData, totalActual, totalBudget, overbudgetItems } = useMemo(() => {
     let actualSum = 0;
     let budgetSum = 0;
     const overList: {
@@ -137,6 +136,7 @@ export const MonthlyBudgetReport: React.FC = () => {
         return {
           id: cat.id,
           name,
+          shortName: name.length > 22 ? `${name.slice(0, 20)}…` : name,
           actualSpent: actual,
           budgetLimit: limit,
           difference: diff,
@@ -145,15 +145,30 @@ export const MonthlyBudgetReport: React.FC = () => {
         };
       })
       // Only include categories that either have a limit set or have spending this month
-      .filter((item) => item.budgetLimit > 0 || item.actualSpent > 0);
+      .filter((item) => item.budgetLimit > 0 || item.actualSpent > 0)
+      // Sort by highest actualSpent first, then by highest budgetLimit
+      .sort((a, b) => {
+        if (b.actualSpent !== a.actualSpent) return b.actualSpent - a.actualSpent;
+        return b.budgetLimit - a.budgetLimit;
+      });
+
+    const activeOnly = data.filter((item) => item.actualSpent > 0);
 
     return {
       chartData: data,
+      activeSpendingData: activeOnly,
       totalActual: actualSum,
       totalBudget: budgetSum,
       overbudgetItems: overList,
     };
   }, [categories, categorySpending, language]);
+
+  const displayedChartData = useMemo(() => {
+    if (chartFilter === 'active' && activeSpendingData.length > 0) {
+      return activeSpendingData;
+    }
+    return chartData;
+  }, [chartFilter, activeSpendingData, chartData]);
 
   const variance = totalBudget - totalActual;
   const isOverallOverBudget = totalBudget > 0 && totalActual > totalBudget;
@@ -162,7 +177,33 @@ export const MonthlyBudgetReport: React.FC = () => {
   // Chart theme colors
   const isDark = theme === 'dark';
   const gridColor = isDark ? 'rgba(51, 65, 85, 0.4)' : '#F1F5F9';
-  const axisColor = isDark ? '#94A3B8' : '#64748B';
+  const axisColor = isDark ? '#CBD5E1' : '#475569';
+
+  // Dynamic chart height so vertical category rows never overlap
+  const dynamicChartHeight = Math.max(280, displayedChartData.length * 46 + 50);
+
+  // Custom Y-Axis Category Tick so labels never collide or wrap awkwardly
+  const renderCategoryTick = (props: any) => {
+    const { x, y, payload } = props;
+    const labelText: string = payload?.value || '';
+    const displayLabel = labelText.length > 22 ? `${labelText.slice(0, 21)}…` : labelText;
+
+    return (
+      <g transform={`translate(${x},${y})`}>
+        <text
+          x={-8}
+          y={0}
+          dy={4}
+          textAnchor="end"
+          fill={axisColor}
+          fontSize={11}
+          fontWeight={600}
+        >
+          {displayLabel}
+        </text>
+      </g>
+    );
+  };
 
   // Custom Recharts Tooltip Component
   const CustomTooltip = ({ active, payload }: any) => {
@@ -177,25 +218,25 @@ export const MonthlyBudgetReport: React.FC = () => {
     const percent = limit > 0 ? Math.round((actual / limit) * 100) : 0;
 
     return (
-      <div className="rounded-xl border border-slate-200 bg-white/95 p-3.5 shadow-xl backdrop-blur-md dark:border-slate-700 dark:bg-slate-900/95 text-xs min-w-[210px] space-y-2">
+      <div className="rounded-xl border border-slate-200 bg-white/95 p-3.5 shadow-xl backdrop-blur-md dark:border-slate-700 dark:bg-slate-900/95 text-xs min-w-[220px] space-y-2 z-50">
         <div className="flex items-center gap-2 border-b border-slate-100 pb-1.5 dark:border-slate-800">
           <span 
             className="h-3 w-3 rounded-full shrink-0" 
             style={{ backgroundColor: data.color }}
           />
-          <span className="font-bold text-slate-900 dark:text-white truncate">
+          <span className="font-bold text-slate-900 dark:text-white">
             {data.name}
           </span>
         </div>
 
         <div className="space-y-1">
-          <div className="flex justify-between items-center text-slate-600 dark:text-slate-300">
+          <div className="flex justify-between items-center gap-4 text-slate-600 dark:text-slate-300">
             <span>{t.actualSpending}:</span>
             <span className="font-mono font-bold text-slate-900 dark:text-white tabular-nums">
               {formatCurrency(actual, baseCurrency)}
             </span>
           </div>
-          <div className="flex justify-between items-center text-slate-600 dark:text-slate-300">
+          <div className="flex justify-between items-center gap-4 text-slate-600 dark:text-slate-300">
             <span>{t.budgetLimit}:</span>
             <span className="font-mono font-semibold text-slate-500 dark:text-slate-400 tabular-nums">
               {limit > 0 ? formatCurrency(limit, baseCurrency) : '-'}
@@ -243,43 +284,70 @@ export const MonthlyBudgetReport: React.FC = () => {
           </p>
         </div>
 
-        {/* Month Selector Controls */}
-        <div className="flex items-center gap-1.5 self-start sm:self-auto bg-slate-50 dark:bg-slate-800/60 p-1 rounded-2xl border border-slate-200 dark:border-slate-700/60 shadow-inner">
-          <button
-            onClick={handlePrevMonth}
-            className="p-1.5 rounded-xl hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors"
-            title={t.prevMonth}
-            aria-label={t.prevMonth}
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </button>
+        {/* Month Selector & Filter Controls */}
+        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+          {activeSpendingData.length > 0 && activeSpendingData.length < chartData.length && (
+            <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200/70 dark:border-slate-700/60">
+              <button
+                onClick={() => setChartFilter('active')}
+                className={`px-2.5 py-1 text-[11px] font-semibold rounded-lg transition-colors cursor-pointer whitespace-nowrap ${
+                  chartFilter === 'active'
+                    ? 'bg-white text-slate-900 shadow-xs dark:bg-slate-900 dark:text-white'
+                    : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'
+                }`}
+              >
+                {language === 'id' ? `Aktif (${activeSpendingData.length})` : `Active (${activeSpendingData.length})`}
+              </button>
+              <button
+                onClick={() => setChartFilter('all')}
+                className={`px-2.5 py-1 text-[11px] font-semibold rounded-lg transition-colors cursor-pointer whitespace-nowrap ${
+                  chartFilter === 'all'
+                    ? 'bg-white text-slate-900 shadow-xs dark:bg-slate-900 dark:text-white'
+                    : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'
+                }`}
+              >
+                {language === 'id' ? `Semua (${chartData.length})` : `All (${chartData.length})`}
+              </button>
+            </div>
+          )}
 
-          <select
-            value={selectedMonth}
-            onChange={(e) => setSelectedMonth(e.target.value)}
-            className="bg-transparent font-medium text-xs text-slate-800 dark:text-slate-200 px-2 py-1 outline-none cursor-pointer text-center font-mono"
-            aria-label={t.selectMonth}
-          >
-            {availableMonths.map((m) => (
-              <option key={m.key} value={m.key} className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200">
-                {m.label}
-              </option>
-            ))}
-          </select>
+          <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-800/60 p-1 rounded-2xl border border-slate-200 dark:border-slate-700/60 shadow-inner">
+            <button
+              onClick={handlePrevMonth}
+              className="p-1.5 rounded-xl hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors cursor-pointer"
+              title={t.prevMonth}
+              aria-label={t.prevMonth}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
 
-          <button
-            onClick={handleNextMonth}
-            disabled={selectedMonth >= currentMonthStr}
-            className={`p-1.5 rounded-xl transition-colors ${
-              selectedMonth >= currentMonthStr
-                ? 'text-slate-300 dark:text-slate-600 cursor-not-allowed'
-                : 'hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300'
-            }`}
-            title={t.nextMonth}
-            aria-label={t.nextMonth}
-          >
-            <ChevronRight className="h-4 w-4" />
-          </button>
+            <select
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+              className="bg-transparent font-medium text-xs text-slate-800 dark:text-slate-200 px-2 py-1 outline-none cursor-pointer text-center font-mono"
+              aria-label={t.selectMonth}
+            >
+              {availableMonths.map((m) => (
+                <option key={m.key} value={m.key} className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200">
+                  {m.label}
+                </option>
+              ))}
+            </select>
+
+            <button
+              onClick={handleNextMonth}
+              disabled={selectedMonth >= currentMonthStr}
+              className={`p-1.5 rounded-xl transition-colors ${
+                selectedMonth >= currentMonthStr
+                  ? 'text-slate-300 dark:text-slate-600 cursor-not-allowed'
+                  : 'hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 cursor-pointer'
+              }`}
+              title={t.nextMonth}
+              aria-label={t.nextMonth}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -335,10 +403,10 @@ export const MonthlyBudgetReport: React.FC = () => {
             )}
           </div>
           <div className="mt-1 flex items-center gap-1.5">
-            <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold ${
+            <span className={`inline-flex items-center text-[11px] font-semibold ${
               isOverallOverBudget 
-                ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300' 
-                : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
+                ? 'text-rose-600 dark:text-rose-400' 
+                : 'text-emerald-600 dark:text-emerald-400'
             }`}>
               {isOverallOverBudget ? t.overBudget : t.withinBudget}
             </span>
@@ -361,7 +429,7 @@ export const MonthlyBudgetReport: React.FC = () => {
                   className="inline-flex items-center gap-1.5 text-[11px] font-medium px-2 py-1 rounded-xl bg-rose-100 dark:bg-rose-900/50 text-rose-800 dark:text-rose-200 border border-rose-200 dark:border-rose-800"
                 >
                   <span className="font-bold">{item.name}</span>
-                  <span className="font-mono text-rose-600 dark:text-rose-300">
+                  <span className="font-mono text-rose-600 dark:text-rose-300 tabular-nums">
                     +{formatCurrency(item.excess, baseCurrency)}
                   </span>
                 </span>
@@ -371,9 +439,9 @@ export const MonthlyBudgetReport: React.FC = () => {
         </div>
       )}
 
-      {/* Recharts Grouped Bar Chart */}
+      {/* Recharts Horizontal Grouped Bar Chart (Prevents Category Label Overlapping) */}
       <div className="mt-6">
-        {chartData.length === 0 ? (
+        {displayedChartData.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 px-4 text-center rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/20">
             <SlidersHorizontal className="h-8 w-8 text-slate-300 dark:text-slate-600 mb-2" />
             <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">
@@ -386,32 +454,26 @@ export const MonthlyBudgetReport: React.FC = () => {
             </p>
             <button
               onClick={() => setActiveTab('budgets')}
-              className="mt-3 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline"
+              className="mt-3 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
             >
               {t.configureBudgets} →
             </button>
           </div>
         ) : (
-          <div className="w-full h-80 sm:h-96">
+          <div className="w-full" style={{ height: `${dynamicChartHeight}px` }}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
-                data={chartData}
-                margin={{ top: 20, right: 10, left: 0, bottom: 25 }}
-                barGap={6}
-                barCategoryGap="20%"
+                data={displayedChartData}
+                layout="vertical"
+                margin={{ top: 12, right: 20, left: 10, bottom: 12 }}
+                barGap={4}
+                barCategoryGap="22%"
               >
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridColor} />
+                <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={true} stroke={gridColor} />
                 <XAxis 
-                  dataKey="name" 
-                  tick={{ fill: axisColor, fontSize: 11 }}
-                  axisLine={{ stroke: gridColor }}
-                  tickLine={false}
-                  interval={0}
-                  tickMargin={8}
-                />
-                <YAxis 
+                  type="number"
                   tick={{ fill: axisColor, fontSize: 10 }}
-                  axisLine={false}
+                  axisLine={{ stroke: gridColor }}
                   tickLine={false}
                   tickFormatter={(val) => {
                     if (val >= 1000000) {
@@ -422,7 +484,15 @@ export const MonthlyBudgetReport: React.FC = () => {
                     }
                     return String(val);
                   }}
-                  width={45}
+                />
+                <YAxis 
+                  type="category"
+                  dataKey="name"
+                  width={155}
+                  tick={renderCategoryTick}
+                  axisLine={false}
+                  tickLine={false}
+                  interval={0}
                 />
                 <Tooltip content={<CustomTooltip />} cursor={{ fill: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)' }} />
                 <Legend 
@@ -430,7 +500,7 @@ export const MonthlyBudgetReport: React.FC = () => {
                   align="right" 
                   iconType="circle"
                   iconSize={8}
-                  wrapperStyle={{ paddingBottom: 12, fontSize: 11 }}
+                  wrapperStyle={{ paddingBottom: 14, fontSize: 11 }}
                   formatter={(value) => {
                     const label = value === 'actualSpent' ? t.actualSpending : t.budgetLimit;
                     return <span className="text-slate-600 dark:text-slate-300 font-medium ml-1 mr-3">{label}</span>;
@@ -441,10 +511,10 @@ export const MonthlyBudgetReport: React.FC = () => {
                 <Bar 
                   dataKey="actualSpent" 
                   name="actualSpent"
-                  radius={[6, 6, 0, 0]}
-                  maxBarSize={32}
+                  radius={[0, 6, 6, 0]}
+                  barSize={12}
                 >
-                  {chartData.map((entry, index) => (
+                  {displayedChartData.map((entry, index) => (
                     <Cell 
                       key={`actual-cell-${index}`} 
                       fill={entry.isOver ? '#F43F5E' : '#3B82F6'} 
@@ -457,8 +527,8 @@ export const MonthlyBudgetReport: React.FC = () => {
                   dataKey="budgetLimit" 
                   name="budgetLimit"
                   fill={isDark ? '#475569' : '#94A3B8'} 
-                  radius={[6, 6, 0, 0]}
-                  maxBarSize={32}
+                  radius={[0, 6, 6, 0]}
+                  barSize={12}
                 />
               </BarChart>
             </ResponsiveContainer>
@@ -467,7 +537,7 @@ export const MonthlyBudgetReport: React.FC = () => {
       </div>
 
       {/* Footer Insight / Tip */}
-      {chartData.length > 0 && overbudgetItems.length === 0 && totalBudget > 0 && (
+      {displayedChartData.length > 0 && overbudgetItems.length === 0 && totalBudget > 0 && (
         <div className="mt-4 flex items-center gap-2 rounded-2xl bg-emerald-50 border border-emerald-200/80 p-3 text-xs text-emerald-800 dark:bg-emerald-950/30 dark:border-emerald-900/50 dark:text-emerald-300">
           <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
           <span>{t.budgetHealthyDesc}</span>
