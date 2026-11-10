@@ -22,7 +22,9 @@ import {
   TrendingUp, 
   TrendingDown,
   Calendar,
-  Layers
+  Layers,
+  EyeOff,
+  Eye
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { modalSpringVariants, backdropVariants } from '../../utils/motionVariants';
@@ -32,6 +34,7 @@ export const WalletDetailModal: React.FC = () => {
     selectedWalletDetail, 
     closeWalletDetail, 
     openEditWallet,
+    updateWallet,
     openEditTransaction,
     openAddTransactionWithWallet,
     transactions,
@@ -137,6 +140,23 @@ export const WalletDetailModal: React.FC = () => {
     openEditWallet(wallet);
   };
 
+  const handleToggleNetWorthInclusion = async () => {
+    try {
+      await updateWallet(wallet.id, {
+        name: wallet.name,
+        type: wallet.type,
+        balance: wallet.balance,
+        initialBalance: wallet.initialBalance,
+        currency: wallet.currency,
+        color: wallet.color,
+        accountNumber: wallet.accountNumber,
+        excludeFromNetWorth: !wallet.excludeFromNetWorth,
+      });
+    } catch (err) {
+      console.error('Failed to toggle Net Worth exclusion:', err);
+    }
+  };
+
   const handleEditMutation = (tx: Transaction) => {
     closeWalletDetail();
     openEditTransaction(tx);
@@ -224,7 +244,7 @@ export const WalletDetailModal: React.FC = () => {
             <div className="flex-1 overflow-y-auto space-y-4 py-4 pr-1">
               {/* Balance Hero Card */}
               <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-gradient-to-br from-slate-50 to-blue-50/30 dark:from-slate-800/50 dark:to-blue-950/20 p-4 sm:p-5 relative overflow-hidden">
-                <div className="flex items-start justify-between">
+                <div className="flex items-start justify-between gap-2">
                   <div>
                     <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                       {language === 'id' ? 'Saldo Dompet Saat Ini' : 'Current Wallet Balance'}
@@ -239,8 +259,8 @@ export const WalletDetailModal: React.FC = () => {
                     )}
                   </div>
 
-                  {/* Balance Status Badge */}
-                  <div>
+                  {/* Balance Status Badge & Net Worth Toggle */}
+                  <div className="flex flex-col items-end gap-1.5">
                     {wallet.balance > 0 ? (
                       <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-1 text-xs font-bold text-emerald-600 dark:text-emerald-400">
                         <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
@@ -252,6 +272,32 @@ export const WalletDetailModal: React.FC = () => {
                         <span>{t.emptyBalanceBadge}</span>
                       </span>
                     )}
+
+                    <button
+                      type="button"
+                      onClick={handleToggleNetWorthInclusion}
+                      className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[11px] font-semibold transition-colors cursor-pointer ${
+                        wallet.excludeFromNetWorth
+                          ? 'border-amber-500/40 bg-amber-500/15 text-amber-700 hover:bg-amber-500/25 dark:text-amber-300'
+                          : 'border-slate-200 bg-white/80 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
+                      }`}
+                    >
+                      {wallet.excludeFromNetWorth ? (
+                        <>
+                          <EyeOff className="h-3 w-3 shrink-0" />
+                          <span>
+                            {language === 'id' ? 'Dikecualikan dari Net Worth' : 'Excluded from Net Worth'}
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <Eye className="h-3 w-3 shrink-0" />
+                          <span>
+                            {language === 'id' ? 'Termasuk dalam Net Worth' : 'Included in Net Worth'}
+                          </span>
+                        </>
+                      )}
+                    </button>
                   </div>
                 </div>
 

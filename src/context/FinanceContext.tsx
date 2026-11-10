@@ -1825,12 +1825,14 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     if (!existing) return;
 
     const updatedWallet: WalletAccount = {
+      ...existing,
       ...updatedData,
       id,
       userId: user?.uid,
     };
 
     setWallets((prev) => prev.map((w) => (w.id === id ? updatedWallet : w)));
+    setSelectedWalletDetail((prev) => (prev && prev.id === id ? updatedWallet : prev));
 
     if (user) {
       const path = `users/${user.uid}/wallets`;

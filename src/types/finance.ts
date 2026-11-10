@@ -37,6 +37,7 @@ export interface WalletAccount {
   currency: SupportedCurrency;
   color: string;
   accountNumber?: string;
+  excludeFromNetWorth?: boolean;
   userId?: string;
 }
 

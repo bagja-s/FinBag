@@ -28,6 +28,8 @@ export const AddWalletModal: React.FC = () => {
   const [currency, setCurrency] = useState<SupportedCurrency>(baseCurrency);
   const [color, setColor] = useState('#2563EB');
   const [accountNumber, setAccountNumber] = useState('');
+  const [excludeFromNetWorth, setExcludeFromNetWorth] = useState(false);
+  const [hasManuallyToggledExclude, setHasManuallyToggledExclude] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
   // Sync state whenever editingWallet or modal open state changes
@@ -39,6 +41,8 @@ export const AddWalletModal: React.FC = () => {
       setCurrency(editingWallet.currency);
       setColor(editingWallet.color || '#2563EB');
       setAccountNumber(editingWallet.accountNumber || '');
+      setExcludeFromNetWorth(Boolean(editingWallet.excludeFromNetWorth));
+      setHasManuallyToggledExclude(true);
     } else {
       setName('');
       setType('bank');
@@ -46,9 +50,19 @@ export const AddWalletModal: React.FC = () => {
       setCurrency(baseCurrency);
       setColor('#2563EB');
       setAccountNumber('');
+      setExcludeFromNetWorth(false);
+      setHasManuallyToggledExclude(false);
     }
     setErrorMsg('');
   }, [editingWallet, isAddWalletModalOpen, baseCurrency]);
+
+  const handleTypeChange = (newType: WalletType) => {
+    setType(newType);
+    // Automatically default Credit Card wallets to be excluded from Net Worth when creating a new wallet
+    if (!isEditing && !hasManuallyToggledExclude) {
+      setExcludeFromNetWorth(newType === 'credit');
+    }
+  };
 
   const colorPalette = [
     '#2563EB', '#059669', '#D97706', '#7C3AED', 
@@ -78,6 +92,7 @@ export const AddWalletModal: React.FC = () => {
           currency,
           color,
           accountNumber: accountNumber.trim() || undefined,
+          excludeFromNetWorth,
         });
       } else {
         await addWallet({
@@ -87,6 +102,7 @@ export const AddWalletModal: React.FC = () => {
           currency,
           color,
           accountNumber: accountNumber.trim() || undefined,
+          excludeFromNetWorth,
         });
       }
 
@@ -177,7 +193,7 @@ export const AddWalletModal: React.FC = () => {
               </label>
               <select
                 value={type}
-                onChange={(e) => setType(e.target.value as WalletType)}
+                onChange={(e) => handleTypeChange(e.target.value as WalletType)}
                 className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-semibold text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white focus:outline-none cursor-pointer"
               >
                 <option value="bank">{t.bank}</option>
@@ -234,6 +250,44 @@ export const AddWalletModal: React.FC = () => {
               placeholder={language === 'id' ? 'cth: •••• 8812 atau 0812345678' : 'e.g. •••• 8812 or 0812345678'}
               className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-medium text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white focus:outline-none transition-shadow"
             />
+          </div>
+
+          {/* Exclude from Net Worth Toggle */}
+          <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 dark:border-slate-800 dark:bg-slate-800/50">
+            <label className="flex items-start justify-between gap-3 cursor-pointer">
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                  {language === 'id'
+                    ? 'Kecualikan dari Kekayaan Bersih (Net Worth)'
+                    : 'Exclude from Net Worth'}
+                </p>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-relaxed">
+                  {language === 'id'
+                    ? 'Aktifkan untuk Kartu Kredit, dana titipan, atau rekening khusus agar saldonya tidak ditambahkan ke total Net Worth.'
+                    : 'Enable for Credit Cards, custodial funds, or dedicated accounts so their balance is not added to total Net Worth.'}
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={excludeFromNetWorth}
+                onClick={() => {
+                  setExcludeFromNetWorth((prev) => !prev);
+                  setHasManuallyToggledExclude(true);
+                }}
+                className={`relative mt-0.5 inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors cursor-pointer ${
+                  excludeFromNetWorth
+                    ? 'bg-amber-500'
+                    : 'bg-slate-300 dark:bg-slate-700'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                    excludeFromNetWorth ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </label>
           </div>
 
           <div>

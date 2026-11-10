@@ -301,6 +301,8 @@ export function validateAndSanitizeBackupJSON(jsonString: string): ValidatedBack
           initialBalance: isValidFiniteAmount(w.initialBalance, true) ? w.initialBalance : w.balance,
           currency: w.currency,
           color: sanitizeTextInput(w.color || '#3B82F6', 25),
+          accountNumber: w.accountNumber ? sanitizeTextInput(w.accountNumber, 50) : undefined,
+          excludeFromNetWorth: Boolean(w.excludeFromNetWorth),
         });
       }
     }

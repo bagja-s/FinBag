@@ -63,6 +63,7 @@ export function calculateNetWorth(
   targetCurrency: SupportedCurrency = 'IDR'
 ): number {
   return wallets.reduce((total, wallet) => {
+    if (wallet.excludeFromNetWorth) return total;
     const converted = convertCurrency(wallet.balance, wallet.currency, targetCurrency, ratesFromUsd);
     return total + converted;
   }, 0);

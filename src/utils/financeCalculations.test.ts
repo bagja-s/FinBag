@@ -31,12 +31,13 @@ test('formatCurrency correctly formats USD with $ symbol and 2 decimal places', 
   assert.equal(result, '$250.75');
 });
 
-test('calculateNetWorth correctly sums multi-currency balances converted to IDR', () => {
+test('calculateNetWorth correctly sums multi-currency balances converted to IDR and skips excluded wallets', () => {
   const mockWallets: WalletAccount[] = [
     { id: 'w1', name: 'Kas Tunai', type: 'cash', balance: 1000000, currency: 'IDR', color: '#10B981' },
     { id: 'w2', name: 'PayPal USD', type: 'ewallet', balance: 100, currency: 'USD', color: '#3B82F6' },
+    { id: 'w3', name: 'Kartu Kredit BCA', type: 'credit', balance: 15000000, currency: 'IDR', color: '#DC2626', excludeFromNetWorth: true },
   ];
-  // 1 USD = 16,250 IDR in fallback rates
+  // 1 USD = 16,250 IDR in fallback rates; w3 is excluded from Net Worth
   const netWorth = calculateNetWorth(mockWallets, { USD: 1, IDR: 16250, EUR: 0.93, SGD: 1.33, MYR: 4.42, JPY: 151.2, GBP: 0.78, AUD: 1.51 }, 'IDR');
   assert.equal(netWorth, 1000000 + 100 * 16250);
 });

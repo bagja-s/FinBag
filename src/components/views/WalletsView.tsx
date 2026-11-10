@@ -12,7 +12,9 @@ import {
   Coins, 
   PiggyBank,
   Edit3,
-  Trash2
+  Trash2,
+  EyeOff,
+  Eye
 } from 'lucide-react';
 import { ConfirmationModal } from '../common/ConfirmationModal';
 import { WalletAccount } from '../../types/finance';
@@ -27,6 +29,7 @@ export const WalletsView: React.FC = () => {
     openAddWallet,
     openEditWallet,
     openWalletDetail,
+    updateWallet,
     deleteWallet,
     setIsTransactionModalOpen, 
     language 
@@ -36,6 +39,25 @@ export const WalletsView: React.FC = () => {
   const [isDeleting, setIsDeleting] = useState(false);
 
   const t = getTranslation(language);
+  const excludedCount = wallets.filter((w) => w.excludeFromNetWorth).length;
+
+  const handleToggleExcludeNetWorth = async (e: React.MouseEvent, wallet: WalletAccount) => {
+    e.stopPropagation();
+    try {
+      await updateWallet(wallet.id, {
+        name: wallet.name,
+        type: wallet.type,
+        balance: wallet.balance,
+        initialBalance: wallet.initialBalance,
+        currency: wallet.currency,
+        color: wallet.color,
+        accountNumber: wallet.accountNumber,
+        excludeFromNetWorth: !wallet.excludeFromNetWorth,
+      });
+    } catch (err) {
+      console.error('Failed to toggle Net Worth exclusion:', err);
+    }
+  };
 
   const getWalletIcon = (type: string) => {
     switch (type) {
@@ -69,7 +91,15 @@ export const WalletsView: React.FC = () => {
             {t.walletTitle}
           </h1>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            {wallets.length} {t.activeWallets} · {language === 'id' ? 'Multi-Rekening & E-Wallet' : 'Multi-Accounts & E-Wallets'}
+            {wallets.length} {t.activeWallets}
+            {excludedCount > 0 && (
+              <span className="ml-1.5 inline-flex items-center gap-1 rounded-md bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-amber-600 dark:text-amber-400">
+                <EyeOff className="h-3 w-3" />
+                {language === 'id'
+                  ? `${excludedCount} dikecualikan dari Net Worth`
+                  : `${excludedCount} excluded from Net Worth`}
+              </span>
+            )}
           </p>
         </div>
 
@@ -123,6 +153,7 @@ export const WalletsView: React.FC = () => {
           {wallets.map((wallet) => {
             const Icon = getWalletIcon(wallet.type);
             const convertedToBase = convertCurrency(wallet.balance, wallet.currency, baseCurrency, exchangeRates.rates);
+            const isExcluded = Boolean(wallet.excludeFromNetWorth);
 
             return (
               <motion.div
@@ -130,7 +161,11 @@ export const WalletsView: React.FC = () => {
                 variants={cardItemVariants}
                 whileHover={{ y: -3 }}
                 onClick={() => openWalletDetail(wallet)}
-                className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 transition-all duration-200 ease-out hover:shadow-md hover:border-blue-500/50 cursor-pointer"
+                className={`group relative overflow-hidden rounded-2xl border p-5 shadow-sm transition-all duration-200 ease-out hover:shadow-md cursor-pointer ${
+                  isExcluded
+                    ? 'border-amber-200/80 bg-white/95 dark:border-amber-900/40 dark:bg-slate-900/90 hover:border-amber-400/60'
+                    : 'border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 hover:border-blue-500/50'
+                }`}
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-3 min-w-0">
@@ -156,6 +191,26 @@ export const WalletsView: React.FC = () => {
                       {wallet.currency}
                     </span>
                     <div className="flex items-center gap-0.5">
+                      <button
+                        onClick={(e) => handleToggleExcludeNetWorth(e, wallet)}
+                        title={
+                          isExcluded
+                            ? language === 'id'
+                              ? 'Dikecualikan dari Net Worth (Klik untuk memasukkan kembali)'
+                              : 'Excluded from Net Worth (Click to include)'
+                            : language === 'id'
+                            ? 'Termasuk dalam Net Worth (Klik untuk mengecualikan)'
+                            : 'Included in Net Worth (Click to exclude)'
+                        }
+                        aria-label="Toggle Net Worth Exclusion"
+                        className={`flex h-7 w-7 items-center justify-center rounded-lg transition-colors cursor-pointer ${
+                          isExcluded
+                            ? 'text-amber-600 bg-amber-50 hover:bg-amber-100 dark:text-amber-400 dark:bg-amber-950/50 dark:hover:bg-amber-900/60'
+                            : 'text-slate-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-slate-800 dark:hover:text-amber-400'
+                        }`}
+                      >
+                        {isExcluded ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                      </button>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -183,13 +238,25 @@ export const WalletsView: React.FC = () => {
                 </div>
 
                 <div className="mt-5">
-                  <p className="text-2xl font-extrabold font-mono text-slate-900 dark:text-white tabular-nums">
-                    {formatCurrency(wallet.balance, wallet.currency)}
-                  </p>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-2xl font-extrabold font-mono text-slate-900 dark:text-white tabular-nums">
+                      {formatCurrency(wallet.balance, wallet.currency)}
+                    </p>
+                  </div>
                   {wallet.currency !== baseCurrency && (
                     <p className="text-xs font-mono text-slate-400 mt-1 tabular-nums">
                       ≈ {formatCurrency(convertedToBase, baseCurrency)} ({baseCurrency})
                     </p>
+                  )}
+                  {isExcluded && (
+                    <div className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-[11px] font-semibold text-amber-700 dark:text-amber-300">
+                      <EyeOff className="h-3 w-3 shrink-0" />
+                      <span>
+                        {language === 'id'
+                          ? 'Dikecualikan dari Net Worth'
+                          : 'Excluded from Net Worth'}
+                      </span>
+                    </div>
                   )}
                 </div>
 

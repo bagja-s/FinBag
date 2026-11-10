@@ -89,7 +89,8 @@ service cloud.firestore {
         isValidBalance(data.balance) &&
         (!('initialBalance' in data) || isValidBalance(data.initialBalance)) &&
         data.currency is string && data.currency.size() <= 5 &&
-        (!('color' in data) || (data.color is string && data.color.size() <= 30));
+        (!('color' in data) || (data.color is string && data.color.size() <= 30)) &&
+        (!('excludeFromNetWorth' in data) || (data.excludeFromNetWorth is bool));
     }
 
     function isValidTransaction(data, userId) {

@@ -19,7 +19,8 @@ import {
   Repeat,
   AlertTriangle,
   CheckCircle2,
-  Play
+  Play,
+  EyeOff
 } from 'lucide-react';
 import { ConfirmationModal } from '../common/ConfirmationModal';
 import { Transaction } from '../../types/finance';
@@ -54,6 +55,8 @@ export const DashboardView: React.FC = () => {
   const currentMonthStr = new Date().toISOString().slice(0, 7); // YYYY-MM
   const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
   const netWorth = calculateNetWorth(wallets, exchangeRates.rates, baseCurrency);
+  const excludedWalletsCount = wallets.filter((w) => w.excludeFromNetWorth).length;
+  const includedWalletsCount = wallets.length - excludedWalletsCount;
   const cashFlow = calculateMonthlyCashFlow(transactions, currentMonthStr, exchangeRates.rates, baseCurrency);
 
   // Upcoming recurring bills within the next 7 days
@@ -102,8 +105,24 @@ export const DashboardView: React.FC = () => {
           <div className="text-3xl sm:text-4xl font-extrabold tracking-tight font-mono tabular-nums">
             {formatCurrency(netWorth, baseCurrency)}
           </div>
-          <p className="mt-1 text-xs text-slate-400">
-            {wallets.length} {t.activeWallets} · {language === 'id' ? 'Terkonversi Kurs Live' : 'Live FX Converted'}
+          <p className="mt-1 text-xs text-slate-400 flex flex-wrap items-center gap-1.5">
+            <span>
+              {excludedWalletsCount > 0
+                ? language === 'id'
+                  ? `${includedWalletsCount} dari ${wallets.length} ${t.activeWallets} dihitung`
+                  : `${includedWalletsCount} of ${wallets.length} ${t.activeWallets} included`
+                : `${wallets.length} ${t.activeWallets}`}
+            </span>
+            <span>·</span>
+            <span>{language === 'id' ? 'Terkonversi Kurs Live' : 'Live FX Converted'}</span>
+            {excludedWalletsCount > 0 && (
+              <span className="inline-flex items-center gap-1 rounded bg-amber-500/20 border border-amber-400/30 px-1.5 py-0.5 text-[10px] font-semibold text-amber-300">
+                <EyeOff className="h-3 w-3" />
+                {language === 'id'
+                  ? `${excludedWalletsCount} dikecualikan`
+                  : `${excludedWalletsCount} excluded`}
+              </span>
+            )}
           </p>
         </div>
 
@@ -169,22 +188,43 @@ export const DashboardView: React.FC = () => {
               <div
                 key={wallet.id}
                 onClick={() => openWalletDetail(wallet)}
-                className="min-w-[200px] sm:min-w-[230px] rounded-2xl border border-slate-200 bg-white p-4 shadow-sm hover:shadow-md hover:-translate-y-1 active:scale-[0.98] dark:border-slate-800 dark:bg-slate-900 transition-all duration-200 ease-out cursor-pointer snap-start"
+                className={`min-w-[200px] sm:min-w-[230px] rounded-2xl border p-4 shadow-sm hover:shadow-md hover:-translate-y-1 active:scale-[0.98] transition-all duration-200 ease-out cursor-pointer snap-start ${
+                  wallet.excludeFromNetWorth
+                    ? 'border-amber-200/80 bg-white/95 dark:border-amber-900/40 dark:bg-slate-900/90'
+                    : 'border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900'
+                }`}
               >
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center justify-between mb-2 gap-1.5">
                   <span className="text-xs font-bold text-slate-900 dark:text-white truncate">
                     {wallet.name}
                   </span>
-                  <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-                    {wallet.currency}
-                  </span>
+                  <div className="flex items-center gap-1 shrink-0">
+                    {wallet.excludeFromNetWorth && (
+                      <span
+                        title={language === 'id' ? 'Dikecualikan dari Net Worth' : 'Excluded from Net Worth'}
+                        className="inline-flex items-center rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-600 dark:text-amber-400"
+                      >
+                        <EyeOff className="h-3 w-3" />
+                      </span>
+                    )}
+                    <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                      {wallet.currency}
+                    </span>
+                  </div>
                 </div>
                 <p className="text-lg font-bold font-mono text-slate-900 dark:text-white tabular-nums">
                   {formatCurrency(wallet.balance, wallet.currency)}
                 </p>
-                <p className="text-[11px] text-slate-500 mt-1 truncate">
-                  {wallet.accountNumber || (wallet.type === 'cash' ? t.cash : wallet.type === 'credit' ? t.creditCard : wallet.type === 'investment' ? t.investment : wallet.type === 'ewallet' ? t.ewallet : t.bank)}
-                </p>
+                <div className="flex items-center justify-between gap-1 mt-1">
+                  <p className="text-[11px] text-slate-500 truncate">
+                    {wallet.accountNumber || (wallet.type === 'cash' ? t.cash : wallet.type === 'credit' ? t.creditCard : wallet.type === 'investment' ? t.investment : wallet.type === 'ewallet' ? t.ewallet : t.bank)}
+                  </p>
+                  {wallet.excludeFromNetWorth && (
+                    <span className="text-[10px] font-semibold text-amber-600 dark:text-amber-400 shrink-0">
+                      {language === 'id' ? 'Non-Net Worth' : 'Excluded'}
+                    </span>
+                  )}
+                </div>
               </div>
             ))}
           </div>

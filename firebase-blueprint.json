@@ -31,6 +31,7 @@
         "currency": { "type": "string", "maxLength": 5 },
         "color": { "type": "string", "maxLength": 30 },
         "accountNumber": { "type": "string", "maxLength": 50 },
+        "excludeFromNetWorth": { "type": "boolean" },
         "userId": { "type": "string", "maxLength": 128 },
         "createdAt": { "type": "string" },
         "updatedAt": { "type": "string" }
