@@ -13,7 +13,8 @@ import {
   AuditEntity,
   AuditLogEntry,
   NotificationPreferences,
-  DEFAULT_NOTIFICATION_PREFERENCES
+  DEFAULT_NOTIFICATION_PREFERENCES,
+  ToastNotice
 } from '../types/finance';
 import { 
   INITIAL_WALLETS, 
@@ -44,7 +45,8 @@ import {
   deleteDoc, 
   onSnapshot, 
   query,
-  getDocs 
+  getDocs,
+  writeBatch
 } from 'firebase/firestore';
 import { User } from 'firebase/auth';
 import { 
@@ -165,10 +167,15 @@ interface FinanceContextType {
   setPreselectedWalletId: (id: string | null) => void;
   openAddTransactionWithWallet: (walletId: string, defaultType?: 'expense' | 'income' | 'transfer') => void;
 
-  // Onboarding Tutorial
+  // Onboarding Tutorial & Command Palette & Toast
   isOnboardingOpen: boolean;
   setIsOnboardingOpen: (open: boolean) => void;
   openTutorial: () => void;
+  isCommandPaletteOpen: boolean;
+  setIsCommandPaletteOpen: (open: boolean) => void;
+  toastNotice: ToastNotice | null;
+  showToast: (message: string, type?: 'success' | 'info' | 'warning') => void;
+  dismissToast: () => void;
 
   // Data
   wallets: WalletAccount[];
@@ -379,6 +386,42 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [editingWallet, setEditingWallet] = useState<WalletAccount | null>(null);
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+  const [toastNotice, setToastNotice] = useState<ToastNotice | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showToast = (message: string, type: 'success' | 'info' | 'warning' = 'success') => {
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+    }
+    setToastNotice({
+      id: `toast_${Date.now()}`,
+      message,
+      type,
+    });
+    toastTimerRef.current = setTimeout(() => {
+      setToastNotice(null);
+    }, 3500);
+  };
+
+  const dismissToast = () => {
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+    }
+    setToastNotice(null);
+  };
+
+  // Global keyboard shortcut for Command Palette (Ctrl+K or Cmd+K)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setIsCommandPaletteOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const openEditTransaction = (tx: Transaction) => {
     setEditingTransaction(tx);
@@ -1336,25 +1379,28 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     // Sync to Firestore if authenticated
     if (user) {
       const txPath = `users/${user.uid}/transactions`;
+      const wPath = `users/${user.uid}/wallets`;
+      const affectedWalletIds = [newTx.sourceWalletId, newTx.targetWalletId].filter(Boolean);
       try {
-        await setDoc(doc(db, txPath, newId), cleanFirestoreData(newTx));
+        const batch = writeBatch(db);
+        batch.set(doc(db, txPath, newId), cleanFirestoreData(newTx));
+        for (const w of updatedWalletsList) {
+          if (affectedWalletIds.includes(w.id)) {
+            batch.set(doc(db, wPath, w.id), cleanFirestoreData(w), { merge: true });
+          }
+        }
+        await batch.commit();
       } catch (err) {
         handleFirestoreError(err, OperationType.WRITE, txPath);
       }
-
-      // Persist updated wallet balances to Firestore
-      const affectedWalletIds = [newTx.sourceWalletId, newTx.targetWalletId].filter(Boolean);
-      for (const w of updatedWalletsList) {
-        if (affectedWalletIds.includes(w.id)) {
-          const wPath = `users/${user.uid}/wallets`;
-          try {
-            await setDoc(doc(db, wPath, w.id), cleanFirestoreData(w), { merge: true });
-          } catch (err) {
-            handleFirestoreError(err, OperationType.WRITE, wPath);
-          }
-        }
-      }
     }
+
+    showToast(
+      language === 'id'
+        ? `Transaksi "${newTx.description}" berhasil disimpan`
+        : `Transaction "${newTx.description}" saved`,
+      'success'
+    );
 
     // Record audit log
     logActivity(
@@ -1459,16 +1505,10 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
       prev.map((t) => (t.id === id ? updatedTx : t)).sort(sortTransactionsNewestFirst)
     );
 
-    // Sync to Firestore
+    // Sync to Firestore atomically via writeBatch
     if (user) {
       const txPath = `users/${user.uid}/transactions`;
-      try {
-        await setDoc(doc(db, txPath, id), cleanFirestoreData(updatedTx));
-      } catch (err) {
-        handleFirestoreError(err, OperationType.WRITE, txPath);
-      }
-
-      // Persist affected wallet balances to Firestore
+      const wPath = `users/${user.uid}/wallets`;
       const affectedWalletIds = [
         oldTx.sourceWalletId,
         oldTx.targetWalletId,
@@ -1476,17 +1516,26 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
         updatedTx.targetWalletId,
       ].filter(Boolean);
 
-      for (const w of updatedWalletsList) {
-        if (affectedWalletIds.includes(w.id)) {
-          const wPath = `users/${user.uid}/wallets`;
-          try {
-            await setDoc(doc(db, wPath, w.id), cleanFirestoreData(w), { merge: true });
-          } catch (err) {
-            handleFirestoreError(err, OperationType.WRITE, wPath);
+      try {
+        const batch = writeBatch(db);
+        batch.set(doc(db, txPath, id), cleanFirestoreData(updatedTx));
+        for (const w of updatedWalletsList) {
+          if (affectedWalletIds.includes(w.id)) {
+            batch.set(doc(db, wPath, w.id), cleanFirestoreData(w), { merge: true });
           }
         }
+        await batch.commit();
+      } catch (err) {
+        handleFirestoreError(err, OperationType.WRITE, txPath);
       }
     }
+
+    showToast(
+      language === 'id'
+        ? `Transaksi "${updatedTx.description}" diperbarui`
+        : `Transaction "${updatedTx.description}" updated`,
+      'success'
+    );
 
     // Record audit log
     logActivity(
@@ -1531,25 +1580,28 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
 
     if (user) {
       const txPath = `users/${user.uid}/transactions`;
+      const wPath = `users/${user.uid}/wallets`;
+      const affectedWalletIds = [txToDelete.sourceWalletId, txToDelete.targetWalletId].filter(Boolean);
       try {
-        await deleteDoc(doc(db, txPath, id));
+        const batch = writeBatch(db);
+        batch.delete(doc(db, txPath, id));
+        for (const w of updatedWalletsList) {
+          if (affectedWalletIds.includes(w.id)) {
+            batch.set(doc(db, wPath, w.id), cleanFirestoreData(w), { merge: true });
+          }
+        }
+        await batch.commit();
       } catch (err) {
         handleFirestoreError(err, OperationType.DELETE, txPath);
       }
-
-      // Persist affected wallet balances to Firestore
-      const affectedWalletIds = [txToDelete.sourceWalletId, txToDelete.targetWalletId].filter(Boolean);
-      for (const w of updatedWalletsList) {
-        if (affectedWalletIds.includes(w.id)) {
-          const wPath = `users/${user.uid}/wallets`;
-          try {
-            await setDoc(doc(db, wPath, w.id), cleanFirestoreData(w), { merge: true });
-          } catch (err) {
-            handleFirestoreError(err, OperationType.WRITE, wPath);
-          }
-        }
-      }
     }
+
+    showToast(
+      language === 'id'
+        ? `Transaksi "${txToDelete.description}" dihapus`
+        : `Transaction "${txToDelete.description}" deleted`,
+      'info'
+    );
 
     // Record audit log
     logActivity(
@@ -1842,6 +1894,13 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
         handleFirestoreError(err, OperationType.WRITE, path);
       }
     }
+
+    showToast(
+      language === 'id'
+        ? `Dompet "${updatedWallet.name}" berhasil diperbarui`
+        : `Wallet "${updatedWallet.name}" updated`,
+      'success'
+    );
 
     // Record audit log
     logActivity(
@@ -2417,6 +2476,11 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
         isOnboardingOpen,
         setIsOnboardingOpen,
         openTutorial,
+        isCommandPaletteOpen,
+        setIsCommandPaletteOpen,
+        toastNotice,
+        showToast,
+        dismissToast,
         selectedWalletDetail,
         setSelectedWalletDetail,
         openWalletDetail,

@@ -1104,6 +1104,50 @@ export function calculateDebtSummary(
   };
 }
 
+export interface CreditUtilizationMetrics {
+  limit: number;
+  usedAmount: number;
+  availableCredit: number;
+  utilizationPercent: number;
+  status: 'safe' | 'warning' | 'danger';
+}
 
+/**
+ * Calculates credit card limit utilization.
+ * Supports two common user mental models for Credit Card wallets:
+ * - If balance <= creditLimit and balance >= 0, `availableCredit = balance` and `usedAmount = creditLimit - balance` (or if negative balance is used for debt, `usedAmount = Math.abs(balance)`).
+ */
+export function calculateCreditUtilization(
+  balance: number,
+  creditLimit?: number
+): CreditUtilizationMetrics | null {
+  if (!creditLimit || creditLimit <= 0) return null;
 
+  let usedAmount = 0;
+  let availableCredit = 0;
 
+  if (balance < 0) {
+    // Negative balance represents billed debt
+    usedAmount = Math.min(creditLimit, Math.abs(balance));
+    availableCredit = Math.max(0, creditLimit - usedAmount);
+  } else if (balance <= creditLimit) {
+    // Positive balance represents remaining available credit limit
+    availableCredit = balance;
+    usedAmount = Math.max(0, creditLimit - balance);
+  } else {
+    availableCredit = balance;
+    usedAmount = 0;
+  }
+
+  const utilizationPercent = Math.min(100, Math.round((usedAmount / creditLimit) * 100));
+  const status: 'safe' | 'warning' | 'danger' =
+    utilizationPercent >= 80 ? 'danger' : utilizationPercent >= 50 ? 'warning' : 'safe';
+
+  return {
+    limit: creditLimit,
+    usedAmount,
+    availableCredit,
+    utilizationPercent,
+    status,
+  };
+}

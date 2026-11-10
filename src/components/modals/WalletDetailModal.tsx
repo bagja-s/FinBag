@@ -150,6 +150,7 @@ export const WalletDetailModal: React.FC = () => {
         currency: wallet.currency,
         color: wallet.color,
         accountNumber: wallet.accountNumber,
+        creditLimit: wallet.creditLimit,
         excludeFromNetWorth: !wallet.excludeFromNetWorth,
       });
     } catch (err) {

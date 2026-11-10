@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useFinance } from '../../context/FinanceContext';
 import { getTranslation } from '../../i18n/translations';
-import { formatCurrency } from '../../utils/financeCalculations';
+import { formatCurrency, calculateCreditUtilization } from '../../utils/financeCalculations';
 import { convertCurrency } from '../../services/currencyService';
 import { 
   Wallet, 
@@ -52,6 +52,7 @@ export const WalletsView: React.FC = () => {
         currency: wallet.currency,
         color: wallet.color,
         accountNumber: wallet.accountNumber,
+        creditLimit: wallet.creditLimit,
         excludeFromNetWorth: !wallet.excludeFromNetWorth,
       });
     } catch (err) {
@@ -154,6 +155,7 @@ export const WalletsView: React.FC = () => {
             const Icon = getWalletIcon(wallet.type);
             const convertedToBase = convertCurrency(wallet.balance, wallet.currency, baseCurrency, exchangeRates.rates);
             const isExcluded = Boolean(wallet.excludeFromNetWorth);
+            const creditUtil = wallet.type === 'credit' ? calculateCreditUtilization(wallet.balance, wallet.creditLimit) : null;
 
             return (
               <motion.div
@@ -248,6 +250,44 @@ export const WalletsView: React.FC = () => {
                       ≈ {formatCurrency(convertedToBase, baseCurrency)} ({baseCurrency})
                     </p>
                   )}
+
+                  {/* Credit Card Utilization Bar */}
+                  {creditUtil && (
+                    <div className="mt-3 space-y-1">
+                      <div className="flex items-center justify-between text-[10px] font-semibold">
+                        <span className="text-slate-500 dark:text-slate-400">
+                          {language === 'id' ? 'Pemakaian Limit' : 'Credit Used'}:{' '}
+                          <span className="font-mono text-slate-700 dark:text-slate-200">
+                            {formatCurrency(creditUtil.usedAmount, wallet.currency)}
+                          </span>
+                        </span>
+                        <span
+                          className={`font-mono ${
+                            creditUtil.status === 'danger'
+                              ? 'text-rose-600 dark:text-rose-400'
+                              : creditUtil.status === 'warning'
+                              ? 'text-amber-600 dark:text-amber-400'
+                              : 'text-emerald-600 dark:text-emerald-400'
+                          }`}
+                        >
+                          {creditUtil.utilizationPercent}% / {formatCurrency(creditUtil.limit, wallet.currency)}
+                        </span>
+                      </div>
+                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                        <div
+                          className={`h-full rounded-full transition-all duration-300 ${
+                            creditUtil.status === 'danger'
+                              ? 'bg-rose-500'
+                              : creditUtil.status === 'warning'
+                              ? 'bg-amber-500'
+                              : 'bg-emerald-500'
+                          }`}
+                          style={{ width: `${Math.max(3, creditUtil.utilizationPercent)}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
                   {isExcluded && (
                     <div className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-[11px] font-semibold text-amber-700 dark:text-amber-300">
                       <EyeOff className="h-3 w-3 shrink-0" />

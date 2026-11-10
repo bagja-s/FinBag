@@ -24,7 +24,8 @@ import {
   Settings,
   TrendingUp,
   Eye,
-  EyeOff
+  EyeOff,
+  Search
 } from 'lucide-react';
 
 export const TopBar: React.FC = () => {
@@ -32,6 +33,7 @@ export const TopBar: React.FC = () => {
     user, 
     isAdmin,
     setActiveTab,
+    setIsCommandPaletteOpen,
     loginWithGoogle, 
     logout, 
     language, 
@@ -129,6 +131,22 @@ export const TopBar: React.FC = () => {
 
         {/* Zone 3: Interactive Controls */}
         <div className="flex items-center gap-2 shrink-0">
+          {/* Quick Search / Command Palette Trigger */}
+          <button
+            type="button"
+            onClick={() => setIsCommandPaletteOpen(true)}
+            title={language === 'id' ? 'Pencarian & Perintah Cepat (Ctrl+K)' : 'Quick Search & Commands (Ctrl+K)'}
+            className="flex h-8 items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 text-xs font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400 dark:hover:text-slate-200 transition-colors cursor-pointer"
+          >
+            <Search className="w-3.5 h-3.5 text-blue-500" />
+            <span className="hidden lg:inline">
+              {language === 'id' ? 'Cari / Perintah...' : 'Search / Command...'}
+            </span>
+            <kbd className="hidden lg:inline-block rounded bg-slate-200/80 px-1.5 py-0.5 font-mono text-[10px] font-bold text-slate-600 dark:bg-slate-700 dark:text-slate-300">
+              ⌘K
+            </kbd>
+          </button>
+
           {/* ================= DESKTOP CONTROLS (Hidden on Mobile) ================= */}
           {/* Currency Picker */}
           <div className="hidden sm:block">

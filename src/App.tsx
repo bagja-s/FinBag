@@ -3,30 +3,45 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { FinanceProvider, useFinance } from './context/FinanceContext';
 import { TopBar } from './components/TopBar';
 import { Sidebar } from './components/Sidebar';
 import { BottomNav } from './components/BottomNav';
 import { DashboardView } from './components/views/DashboardView';
-import { WalletsView } from './components/views/WalletsView';
-import { ExchangeRatesView } from './components/views/ExchangeRatesView';
-import { BudgetsView } from './components/views/BudgetsView';
-import { TransactionsView } from './components/views/TransactionsView';
-import { ToolsView } from './components/views/ToolsView';
-import { SettingsView } from './components/views/SettingsView';
-import { AdminView } from './components/views/AdminView';
 import { LoginView } from './components/views/LoginView';
 import { TransactionModal } from './components/modals/TransactionModal';
 import { AddWalletModal } from './components/modals/AddWalletModal';
 import { WalletDetailModal } from './components/modals/WalletDetailModal';
 import { PinLockModal } from './components/modals/PinLockModal';
+import { CommandPaletteModal } from './components/modals/CommandPaletteModal';
 import { OnboardingTutorialModal } from './components/onboarding/OnboardingTutorialModal';
 import { useOnlineStatus } from './hooks/useOnlineStatus';
-import { WifiOff, Loader2, UserX, Clock } from 'lucide-react';
+import { WifiOff, Loader2, UserX, Clock, CheckCircle2, Info, AlertTriangle, X } from 'lucide-react';
 import { getTranslation } from './i18n/translations';
 import { AnimatePresence, motion } from 'motion/react';
 import { pageVariants } from './utils/motionVariants';
+
+// Code-split secondary views for faster initial bundle load
+const WalletsView = lazy(() => import('./components/views/WalletsView').then((m) => ({ default: m.WalletsView })));
+const ExchangeRatesView = lazy(() => import('./components/views/ExchangeRatesView').then((m) => ({ default: m.ExchangeRatesView })));
+const BudgetsView = lazy(() => import('./components/views/BudgetsView').then((m) => ({ default: m.BudgetsView })));
+const TransactionsView = lazy(() => import('./components/views/TransactionsView').then((m) => ({ default: m.TransactionsView })));
+const ToolsView = lazy(() => import('./components/views/ToolsView').then((m) => ({ default: m.ToolsView })));
+const SettingsView = lazy(() => import('./components/views/SettingsView').then((m) => ({ default: m.SettingsView })));
+const AdminView = lazy(() => import('./components/views/AdminView').then((m) => ({ default: m.AdminView })));
+
+const ViewSkeletonFallback: React.FC = () => (
+  <div className="space-y-4 py-2 animate-pulse">
+    <div className="h-8 w-48 rounded-xl bg-slate-200 dark:bg-slate-800" />
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="h-32 rounded-2xl bg-slate-200 dark:bg-slate-800" />
+      <div className="h-32 rounded-2xl bg-slate-200 dark:bg-slate-800" />
+      <div className="h-32 rounded-2xl bg-slate-200 dark:bg-slate-800" />
+    </div>
+    <div className="h-64 rounded-2xl bg-slate-200 dark:bg-slate-800" />
+  </div>
+);
 
 const MainLayout: React.FC = () => {
   const { 
@@ -40,7 +55,9 @@ const MainLayout: React.FC = () => {
     appPin, 
     isAppUnlocked, 
     announcementNotice,
-    announcementExpiry
+    announcementExpiry,
+    toastNotice,
+    dismissToast
   } = useFinance();
   const isOnline = useOnlineStatus();
   const t = getTranslation(language);
@@ -96,6 +113,37 @@ const MainLayout: React.FC = () => {
       {/* PIN Lock Screen if locked */}
       {appPin && !isAppUnlocked && <PinLockModal />}
 
+      {/* Interactive Toast Feedback Banner */}
+      <AnimatePresence>
+        {toastNotice && (
+          <motion.div
+            key={toastNotice.id}
+            initial={{ opacity: 0, y: 24, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 16, scale: 0.96 }}
+            transition={{ duration: 0.2 }}
+            className="fixed bottom-20 lg:bottom-6 right-4 z-[75] max-w-sm rounded-2xl border border-slate-200/90 bg-white/95 px-4 py-3 text-xs font-semibold text-slate-800 shadow-xl backdrop-blur-md dark:border-slate-700/80 dark:bg-slate-900/95 dark:text-slate-100 flex items-center gap-2.5"
+          >
+            {toastNotice.type === 'success' ? (
+              <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
+            ) : toastNotice.type === 'warning' ? (
+              <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500" />
+            ) : (
+              <Info className="h-4 w-4 shrink-0 text-blue-500" />
+            )}
+            <span className="leading-snug">{toastNotice.message}</span>
+            <button
+              type="button"
+              onClick={dismissToast}
+              className="ml-1 rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 cursor-pointer"
+              aria-label="Dismiss"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Offline Toast */}
       {!isOnline && (
         <div className="fixed bottom-20 left-4 right-4 z-50 mx-auto max-w-sm rounded-xl bg-amber-500/95 backdrop-blur-md px-3.5 py-2.5 text-xs font-semibold text-white shadow-xl flex items-center gap-2">
@@ -143,14 +191,16 @@ const MainLayout: React.FC = () => {
               exit="exit"
               className="w-full"
             >
-              {activeTab === 'dashboard' && <DashboardView />}
-              {activeTab === 'wallets' && <WalletsView />}
-              {activeTab === 'rates' && <ExchangeRatesView />}
-              {activeTab === 'budgets' && <BudgetsView />}
-              {activeTab === 'transactions' && <TransactionsView />}
-              {activeTab === 'tools' && <ToolsView />}
-              {activeTab === 'settings' && <SettingsView />}
-              {activeTab === 'admin' && <AdminView />}
+              <Suspense fallback={<ViewSkeletonFallback />}>
+                {activeTab === 'dashboard' && <DashboardView />}
+                {activeTab === 'wallets' && <WalletsView />}
+                {activeTab === 'rates' && <ExchangeRatesView />}
+                {activeTab === 'budgets' && <BudgetsView />}
+                {activeTab === 'transactions' && <TransactionsView />}
+                {activeTab === 'tools' && <ToolsView />}
+                {activeTab === 'settings' && <SettingsView />}
+                {activeTab === 'admin' && <AdminView />}
+              </Suspense>
             </motion.div>
           </AnimatePresence>
         </main>
@@ -163,6 +213,7 @@ const MainLayout: React.FC = () => {
       <TransactionModal />
       <AddWalletModal />
       <WalletDetailModal />
+      <CommandPaletteModal />
       <OnboardingTutorialModal />
     </div>
   );

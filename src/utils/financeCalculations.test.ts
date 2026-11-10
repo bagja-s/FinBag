@@ -18,6 +18,7 @@ import {
   getUpcomingRecurringBills,
   calculateGoalProgressAndEta,
   calculateDebtSummary,
+  calculateCreditUtilization,
 } from './financeCalculations';
 import { WalletAccount, Transaction, BudgetCategory, RecurringTransaction, SavingsGoal, DebtRecord } from '../types/finance';
 
@@ -292,5 +293,20 @@ test('calculateGoalProgressAndEta and calculateDebtSummary compute goal ETA and 
   assert.equal(debtSum.unpaidPayableCount, 1);
 });
 
+test('calculateCreditUtilization computes credit card limit usage and status accurately', () => {
+  const safe = calculateCreditUtilization(16000000, 20000000); // 16M remaining out of 20M limit -> 4M used (20%)
+  assert.ok(safe);
+  assert.equal(safe.usedAmount, 4000000);
+  assert.equal(safe.availableCredit, 16000000);
+  assert.equal(safe.utilizationPercent, 20);
+  assert.equal(safe.status, 'safe');
 
+  const danger = calculateCreditUtilization(2000000, 20000000); // 2M remaining out of 20M limit -> 18M used (90%)
+  assert.ok(danger);
+  assert.equal(danger.usedAmount, 18000000);
+  assert.equal(danger.utilizationPercent, 90);
+  assert.equal(danger.status, 'danger');
 
+  const noLimit = calculateCreditUtilization(5000000, undefined);
+  assert.equal(noLimit, null);
+});

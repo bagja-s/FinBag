@@ -262,6 +262,11 @@ export const TransactionsView: React.FC = () => {
     return groupTransactionsByDate(filtered, exchangeRates.rates, baseCurrency);
   }, [filtered, exchangeRates.rates, baseCurrency]);
 
+  const [visibleGroupsCount, setVisibleGroupsCount] = useState<number>(10);
+  const visibleDateGroups = useMemo(() => {
+    return dateGroups.slice(0, visibleGroupsCount);
+  }, [dateGroups, visibleGroupsCount]);
+
   // Format YYYY-MM-DD into natural localized date label with Today / Yesterday prefix
   const formatDateGroupHeader = (dateStr: string): string => {
     if (!dateStr || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
@@ -906,7 +911,7 @@ export const TransactionsView: React.FC = () => {
         </div>
       ) : (
         <div className="space-y-4">
-          {dateGroups.map((group) => (
+          {visibleDateGroups.map((group) => (
             <div
               key={group.date}
               className="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900 overflow-hidden"
@@ -1044,6 +1049,23 @@ export const TransactionsView: React.FC = () => {
               </div>
             </div>
           ))}
+
+          {dateGroups.length > visibleGroupsCount && (
+            <div className="flex justify-center pt-2">
+              <button
+                type="button"
+                onClick={() => setVisibleGroupsCount((prev) => prev + 10)}
+                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-xs font-bold text-slate-700 shadow-xs hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                <ChevronDown className="h-4 w-4 text-blue-500" />
+                <span>
+                  {language === 'id'
+                    ? `Tampilkan Lebih Banyak (${dateGroups.length - visibleGroupsCount} grup tanggal lagi)`
+                    : `Load More (${dateGroups.length - visibleGroupsCount} more date groups)`}
+                </span>
+              </button>
+            </div>
+          )}
         </div>
       )}
 

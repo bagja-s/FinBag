@@ -32,6 +32,7 @@
         "color": { "type": "string", "maxLength": 30 },
         "accountNumber": { "type": "string", "maxLength": 50 },
         "excludeFromNetWorth": { "type": "boolean" },
+        "creditLimit": { "type": "number" },
         "userId": { "type": "string", "maxLength": 128 },
         "createdAt": { "type": "string" },
         "updatedAt": { "type": "string" }

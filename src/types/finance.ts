@@ -38,7 +38,14 @@ export interface WalletAccount {
   color: string;
   accountNumber?: string;
   excludeFromNetWorth?: boolean;
+  creditLimit?: number;
   userId?: string;
+}
+
+export interface ToastNotice {
+  id: string;
+  message: string;
+  type: 'success' | 'info' | 'warning';
 }
 
 export interface BudgetCategory {

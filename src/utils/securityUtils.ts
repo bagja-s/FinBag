@@ -303,6 +303,7 @@ export function validateAndSanitizeBackupJSON(jsonString: string): ValidatedBack
           color: sanitizeTextInput(w.color || '#3B82F6', 25),
           accountNumber: w.accountNumber ? sanitizeTextInput(w.accountNumber, 50) : undefined,
           excludeFromNetWorth: Boolean(w.excludeFromNetWorth),
+          creditLimit: isValidFiniteAmount(w.creditLimit, false) ? w.creditLimit : undefined,
         });
       }
     }

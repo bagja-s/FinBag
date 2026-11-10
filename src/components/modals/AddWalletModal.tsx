@@ -28,6 +28,7 @@ export const AddWalletModal: React.FC = () => {
   const [currency, setCurrency] = useState<SupportedCurrency>(baseCurrency);
   const [color, setColor] = useState('#2563EB');
   const [accountNumber, setAccountNumber] = useState('');
+  const [creditLimitStr, setCreditLimitStr] = useState('');
   const [excludeFromNetWorth, setExcludeFromNetWorth] = useState(false);
   const [hasManuallyToggledExclude, setHasManuallyToggledExclude] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -41,6 +42,7 @@ export const AddWalletModal: React.FC = () => {
       setCurrency(editingWallet.currency);
       setColor(editingWallet.color || '#2563EB');
       setAccountNumber(editingWallet.accountNumber || '');
+      setCreditLimitStr(editingWallet.creditLimit ? String(editingWallet.creditLimit) : '');
       setExcludeFromNetWorth(Boolean(editingWallet.excludeFromNetWorth));
       setHasManuallyToggledExclude(true);
     } else {
@@ -50,6 +52,7 @@ export const AddWalletModal: React.FC = () => {
       setCurrency(baseCurrency);
       setColor('#2563EB');
       setAccountNumber('');
+      setCreditLimitStr('');
       setExcludeFromNetWorth(false);
       setHasManuallyToggledExclude(false);
     }
@@ -82,6 +85,7 @@ export const AddWalletModal: React.FC = () => {
       return;
     }
     const balance = parseFloat(balanceStr) || 0;
+    const parsedCreditLimit = type === 'credit' && creditLimitStr ? Math.max(0, parseFloat(creditLimitStr) || 0) : undefined;
 
     try {
       if (isEditing && editingWallet) {
@@ -93,6 +97,7 @@ export const AddWalletModal: React.FC = () => {
           color,
           accountNumber: accountNumber.trim() || undefined,
           excludeFromNetWorth,
+          creditLimit: parsedCreditLimit && parsedCreditLimit > 0 ? parsedCreditLimit : undefined,
         });
       } else {
         await addWallet({
@@ -103,6 +108,7 @@ export const AddWalletModal: React.FC = () => {
           color,
           accountNumber: accountNumber.trim() || undefined,
           excludeFromNetWorth,
+          creditLimit: parsedCreditLimit && parsedCreditLimit > 0 ? parsedCreditLimit : undefined,
         });
       }
 
@@ -142,7 +148,7 @@ export const AddWalletModal: React.FC = () => {
             animate="visible"
             exit="exit"
             style={{ willChange: 'transform, opacity' }}
-            className="relative z-10 w-full max-w-md rounded-t-3xl sm:rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-900"
+            className="relative z-10 w-full max-w-md rounded-t-3xl sm:rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-900 max-h-[92vh] overflow-y-auto"
             role="dialog"
           >
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
@@ -225,18 +231,45 @@ export const AddWalletModal: React.FC = () => {
             </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-              {isEditing ? (language === 'id' ? 'Saldo Dompet' : 'Wallet Balance') : t.initialBalance}
-            </label>
-            <input
-              type="number"
-              step="any"
-              value={balanceStr}
-              onChange={(e) => setBalanceStr(e.target.value)}
-              placeholder="0"
-              className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-mono font-bold text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 tabular-nums transition-shadow"
-            />
+          <div className={type === 'credit' ? 'grid grid-cols-1 sm:grid-cols-2 gap-3' : ''}>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                {type === 'credit'
+                  ? language === 'id'
+                    ? 'Sisa Limit / Saldo Kartu'
+                    : 'Available Credit / Balance'
+                  : isEditing
+                  ? language === 'id'
+                    ? 'Saldo Dompet'
+                    : 'Wallet Balance'
+                  : t.initialBalance}
+              </label>
+              <input
+                type="number"
+                step="any"
+                value={balanceStr}
+                onChange={(e) => setBalanceStr(e.target.value)}
+                placeholder="0"
+                className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-mono font-bold text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 tabular-nums transition-shadow"
+              />
+            </div>
+
+            {type === 'credit' && (
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  {language === 'id' ? 'Total Pagu Limit (Opsional)' : 'Total Credit Limit (Optional)'}
+                </label>
+                <input
+                  type="number"
+                  step="any"
+                  min="0"
+                  value={creditLimitStr}
+                  onChange={(e) => setCreditLimitStr(e.target.value)}
+                  placeholder={language === 'id' ? 'cth: 20000000' : 'e.g. 5000'}
+                  className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-mono font-bold text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 tabular-nums transition-shadow"
+                />
+              </div>
+            )}
           </div>
 
           <div>
